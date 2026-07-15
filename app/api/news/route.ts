@@ -180,14 +180,20 @@ export async function GET(request: NextRequest) {
   const googleUrls = new Set(googleItems.map((item) => item.url))
   const terms = normalize(query).split(/\s+/).filter((term) => term.length > 1)
   const cutoff = period ? Date.now() - period * 86_400_000 : 0
+  const byRelevance = sort === "relevance" && query.length > 0
   const combined = [...googleItems, ...localItems]
+
+  // Score and parse each item once, then filter/sort on the precomputed values
+  // instead of recomputing relevance() inside the sort comparator.
   const unique = Array.from(new Map(combined.map((item) => [item.url, item])).values())
-    .filter((item) => !query || googleUrls.has(item.url) || relevance(item, terms) > 0)
-    .filter((item) => category === "Todas" || item.category === category)
-    .filter((item) => source === "Todas" || item.source === source)
-    .filter((item) => !cutoff || Date.parse(item.publishedAt) >= cutoff)
-    .sort((a, b) => sort === "relevance" && query ? relevance(b, terms) - relevance(a, terms) || Date.parse(b.publishedAt) - Date.parse(a.publishedAt) : Date.parse(b.publishedAt) - Date.parse(a.publishedAt))
+    .map((item) => ({ item, score: query ? relevance(item, terms) : 0, time: Date.parse(item.publishedAt) }))
+    .filter(({ item, score }) => !query || googleUrls.has(item.url) || score > 0)
+    .filter(({ item }) => category === "Todas" || item.category === category)
+    .filter(({ item }) => source === "Todas" || item.source === source)
+    .filter(({ time }) => !cutoff || time >= cutoff)
+    .sort((a, b) => (byRelevance ? b.score - a.score || b.time - a.time : b.time - a.time))
     .slice(0, 100)
+    .map(({ item }) => item)
 
   const items = unique.length ? unique : query ? [] : FALLBACK_NEWS
   const payload: NewsResponse = {
