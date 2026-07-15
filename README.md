@@ -49,6 +49,8 @@ A interface é mobile-first com Tailwind (`sm:`/`md:`/`lg:`), testada em 320px, 
 - Miniaturas de imagem nas notícias quando o feed original fornece uma (com fallback silencioso se a imagem não carregar).
 - Estados de carregamento com skeletons, botão "voltar ao topo" e atalho de teclado `/` para focar a busca.
 - Tema claro/escuro (incluindo um modo escuro bem próximo do preto) com persistência da preferência do usuário.
+- **PWA instalável**: manifest, ícones (192/512, incl. maskable) e service worker (`public/sw.js`), então o navegador oferece "Instalar Órbita" e o app funciona offline (shell em cache; a API de notícias nunca é cacheada).
+- **SEO**: `robots.txt`, `sitemap.xml`, metadados Open Graph/Twitter, URL canônica e dados estruturados JSON-LD (schema.org `WebSite`), gerados por `app/robots.ts`, `app/sitemap.ts` e `app/layout.tsx`.
 
 ## Segurança
 
