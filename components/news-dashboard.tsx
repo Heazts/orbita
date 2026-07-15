@@ -11,6 +11,23 @@ const fetcher = async (url: string): Promise<NewsResponse> => {
   return response.json()
 }
 
+function readStore<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as T) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function writeStore(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, typeof value === "string" ? value : JSON.stringify(value))
+  } catch {
+    // Private mode or quota exceeded — persistence is best-effort.
+  }
+}
+
 const timeFormatter = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })
 const SUGGESTIONS = ["Inteligência artificial", "Brasil", "Economia mundial", "Mudanças climáticas", "Eleições", "Espaço"]
 const CURRENT_YEAR = new Date().getFullYear()
@@ -53,10 +70,8 @@ function Actions({ item, favorite, toggleFavorite, share }: { item: NewsItem; fa
 function NewsImage({ src, lead }: { src: string; lead?: boolean }) {
   const [failed, setFailed] = useState(false)
   if (failed) return null
-  // Plain <img> is intentional: these come from arbitrary, unvetted RSS
-  // feed domains. next/image's optimizer would have the server itself
-  // fetch that external URL (an SSRF surface), so images are fetched
-  // client-side only.
+  // Plain <img>, not next/image: these URLs come from arbitrary feed domains
+  // and next/image's optimizer would make the server fetch them (SSRF surface).
   // eslint-disable-next-line @next/next/no-img-element
   return <img
     src={src}
@@ -131,10 +146,10 @@ export function NewsDashboard() {
   })
 
   useEffect(() => {
-    // Hydrating client-only persisted state (localStorage/theme) that must run after mount.
+    // Hydrate client-only persisted state after mount.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFavorites(JSON.parse(localStorage.getItem("orbita-favorites") ?? "{}") as Record<string, NewsItem>)
-    setHistory(JSON.parse(localStorage.getItem("orbita-history") ?? "[]") as string[])
+    setFavorites(readStore<Record<string, NewsItem>>("orbita-favorites", {}))
+    setHistory(readStore<string[]>("orbita-history", []))
     setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light")
     setNow(Date.now())
     const interval = window.setInterval(() => setNow(Date.now()), 60000)
@@ -160,7 +175,7 @@ export function NewsDashboard() {
       if (next.length > 1) {
         setHistory((current) => {
           const updated = [next, ...current.filter((term) => term.toLocaleLowerCase("pt-BR") !== next.toLocaleLowerCase("pt-BR"))].slice(0, 6)
-          localStorage.setItem("orbita-history", JSON.stringify(updated))
+          writeStore("orbita-history", updated)
           return updated
         })
       }
@@ -175,7 +190,7 @@ export function NewsDashboard() {
       const next = { ...current }
       if (next[item.id]) delete next[item.id]
       else next[item.id] = item
-      localStorage.setItem("orbita-favorites", JSON.stringify(next))
+      writeStore("orbita-favorites", next)
       return next
     })
   }
@@ -190,7 +205,7 @@ export function NewsDashboard() {
     const next = theme === "dark" ? "light" : "dark"
     document.documentElement.classList.remove("light", "dark")
     document.documentElement.classList.add(next)
-    localStorage.setItem("orbita-theme", next)
+    writeStore("orbita-theme", next)
     setTheme(next)
   }
   const clear = () => { setInput(""); setQuery(""); setCategory("Todas"); setPeriod("all"); setSort("latest"); setSource("Todas"); setFavoritesOnly(false) }
