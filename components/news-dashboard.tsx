@@ -37,14 +37,16 @@ function Highlight({ text, query }: { text: string; query: string }) {
 }
 
 function IconButton({ label, onClick, active, children }: { label: string; onClick: () => void; active?: boolean; children: React.ReactNode }) {
-  return <button type="button" onClick={onClick} aria-label={label} aria-pressed={active} className="flex size-9 items-center justify-center rounded-full border bg-background transition-colors hover:bg-muted aria-pressed:bg-primary aria-pressed:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{children}</button>
+  // text-foreground is explicit so the icon stays visible even inside the lead
+  // card, which sets text-primary-foreground (same tone as bg-background).
+  return <button type="button" onClick={onClick} aria-label={label} aria-pressed={active} className="flex size-9 items-center justify-center rounded-full border border-border bg-background text-foreground transition-colors hover:bg-muted aria-pressed:bg-primary aria-pressed:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{children}</button>
 }
 
 function Actions({ item, favorite, toggleFavorite, share }: { item: NewsItem; favorite: boolean; toggleFavorite: () => void; share: () => void }) {
   return <div className="relative flex items-center gap-2">
     <IconButton label={favorite ? "Remover dos favoritos" : "Salvar nos favoritos"} active={favorite} onClick={toggleFavorite}><Heart className="size-4" fill={favorite ? "currentColor" : "none"} aria-hidden="true" /></IconButton>
     <IconButton label={`Compartilhar ${item.title}`} onClick={share}><Share2 className="size-4" aria-hidden="true" /></IconButton>
-    <a href={item.url} target="_blank" rel="noopener noreferrer" aria-label={`Abrir no site ${item.source}`} className="flex size-9 items-center justify-center rounded-full border bg-background hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><ExternalLink className="size-4" aria-hidden="true" /></a>
+    <a href={item.url} target="_blank" rel="noopener noreferrer" aria-label={`Abrir no site ${item.source}`} className="flex size-9 items-center justify-center rounded-full border border-border bg-background text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><ExternalLink className="size-4" aria-hidden="true" /></a>
   </div>
 }
 
