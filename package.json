@@ -10,7 +10,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@vercel/analytics": "1.6.1",
+    "@vercel/analytics": "2.0.1",
     "fast-xml-parser": "^5.10.0",
     "lucide-react": "^1.24.0",
     "next": "16.2.10",
