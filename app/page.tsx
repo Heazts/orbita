@@ -1,5 +1,5 @@
 import { NewsDashboard } from "@/components/news-dashboard"
 
 export default function Page() {
-  return <NewsDashboard initialNow={Date.now()} />
+  return <NewsDashboard />
 }

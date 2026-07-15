@@ -10,14 +10,21 @@ const lora = Lora({ subsets: ["latin"], variable: "--font-lora" })
 export const metadata: Metadata = {
   title: "Órbita — Notícias do mundo ao vivo",
   description: "As principais notícias do Brasil e do mundo, reunidas de fontes públicas e atualizadas ao vivo.",
-  generator: "v0.app",
+  icons: {
+    icon: [
+      { url: "/icon-light-32x32.png", media: "(prefers-color-scheme: light)" },
+      { url: "/icon-dark-32x32.png", media: "(prefers-color-scheme: dark)" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/apple-icon.png",
+  },
 }
 
 export const viewport: Viewport = {
   colorScheme: "light dark",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f7f6f2" },
-    { media: "(prefers-color-scheme: dark)", color: "#151515" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
   ],
 }
 

@@ -1,8 +1,8 @@
 "use client"
 
 import useSWR from "swr"
-import { Bookmark, Check, Clock3, Copy, ExternalLink, Heart, Moon, RefreshCw, Search, Share2, SlidersHorizontal, Sun, X } from "lucide-react"
-import { Fragment, useEffect, useMemo, useState } from "react"
+import { Bookmark, Check, Clock3, ExternalLink, Heart, Moon, RefreshCw, Search, Share2, SlidersHorizontal, Sun, X } from "lucide-react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { FALLBACK_NEWS, NEWS_CATEGORIES, type NewsCategory, type NewsItem, type NewsResponse } from "@/lib/news"
 
 const fetcher = async (url: string): Promise<NewsResponse> => {
@@ -13,11 +13,13 @@ const fetcher = async (url: string): Promise<NewsResponse> => {
 
 const timeFormatter = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })
 const SUGGESTIONS = ["Inteligência artificial", "Brasil", "Economia mundial", "Mudanças climáticas", "Eleições", "Espaço"]
+const CURRENT_YEAR = new Date().getFullYear()
 
 type Period = "all" | "1" | "7" | "30"
 type Sort = "latest" | "relevance"
 
-function relativeTime(value: string, now: number) {
+function relativeTime(value: string, now: number | null) {
+  if (now === null) return ""
   const minutes = Math.max(0, Math.round((now - Date.parse(value)) / 60_000))
   if (minutes < 1) return "agora"
   if (minutes < 60) return `há ${minutes} min`
@@ -46,8 +48,27 @@ function Actions({ item, favorite, toggleFavorite, share }: { item: NewsItem; fa
   </div>
 }
 
-function NewsCard({ item, now, query, favorite, onFavorite, onShare, lead = false }: { item: NewsItem; now: number; query: string; favorite: boolean; onFavorite: () => void; onShare: () => void; lead?: boolean }) {
-  return <article className={lead ? "flex flex-col gap-5 rounded-xl bg-primary p-6 text-primary-foreground md:p-9" : "flex flex-col gap-4 border-b py-6 last:border-0"}>
+function NewsImage({ src, lead }: { src: string; lead?: boolean }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return null
+  // Plain <img> is intentional: these come from arbitrary, unvetted RSS
+  // feed domains. next/image's optimizer would have the server itself
+  // fetch that external URL (an SSRF surface), so images are fetched
+  // client-side only.
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img
+    src={src}
+    alt=""
+    loading="lazy"
+    decoding="async"
+    referrerPolicy="no-referrer"
+    onError={() => setFailed(true)}
+    className={lead ? "aspect-video w-full rounded-lg object-cover" : "aspect-square size-20 shrink-0 rounded-lg object-cover sm:size-24"}
+  />
+}
+
+function NewsCard({ item, now, query, favorite, onFavorite, onShare, lead = false }: { item: NewsItem; now: number | null; query: string; favorite: boolean; onFavorite: () => void; onShare: () => void; lead?: boolean }) {
+  const content = <>
     <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider opacity-70">
       <span>{item.category}</span><span aria-hidden="true">•</span><span>{item.source}</span><span aria-hidden="true">•</span><time dateTime={item.publishedAt}>{relativeTime(item.publishedAt, now)}</time>
     </div>
@@ -57,11 +78,24 @@ function NewsCard({ item, now, query, favorite, onFavorite, onShare, lead = fals
       <span className="text-xs opacity-60">Fonte original</span>
       <Actions item={item} favorite={favorite} toggleFavorite={onFavorite} share={onShare} />
     </div>
+  </>
+
+  if (lead) {
+    return <article className="flex flex-col gap-5 rounded-xl bg-primary p-6 text-primary-foreground md:p-9">
+      {item.image && <NewsImage src={item.image} lead />}
+      {content}
+    </article>
+  }
+
+  return <article className="flex gap-4 border-b py-6 last:border-0">
+    {item.image && <NewsImage src={item.image} />}
+    <div className="flex min-w-0 flex-1 flex-col gap-4">{content}</div>
   </article>
 }
 
-export function NewsDashboard({ initialNow }: { initialNow: number }) {
-  const [now, setNow] = useState(initialNow)
+export function NewsDashboard() {
+  const searchRef = useRef<HTMLInputElement>(null)
+  const [now, setNow] = useState<number | null>(null)
   const [input, setInput] = useState("")
   const [query, setQuery] = useState("")
   const [category, setCategory] = useState<NewsCategory>("Todas")
@@ -74,7 +108,10 @@ export function NewsDashboard({ initialNow }: { initialNow: number }) {
   const [history, setHistory] = useState<string[]>([])
   const [theme, setTheme] = useState<"light" | "dark">("light")
   const [notice, setNotice] = useState("")
-  const fallbackItems = useMemo(() => FALLBACK_NEWS.map((item, index) => ({ ...item, publishedAt: new Date(initialNow - index * 1800000).toISOString() })), [initialNow])
+  const fallbackItems = useMemo(
+    () => (now === null ? [] : FALLBACK_NEWS.map((item, index) => ({ ...item, publishedAt: new Date(now - index * 1800000).toISOString() }))),
+    [now],
+  )
 
   const searchParams = new URLSearchParams()
   if (query) searchParams.set("q", query)
@@ -82,19 +119,36 @@ export function NewsDashboard({ initialNow }: { initialNow: number }) {
   if (period !== "all") searchParams.set("period", period)
   if (sort !== "latest") searchParams.set("sort", sort)
   if (source !== "Todas") searchParams.set("source", source)
-  const apiUrl = `/api/news${searchParams.size ? `?${searchParams.toString()}` : ""}`
+  const queryString = searchParams.toString()
+  const apiUrl = `/api/news${queryString ? `?${queryString}` : ""}`
+  const showFallback = now !== null && !query && category === "Todas" && period === "all" && source === "Todas"
   const { data, error, isLoading, isValidating, mutate } = useSWR<NewsResponse>(apiUrl, fetcher, {
     refreshInterval: 300000,
-    fallbackData: query || category !== "Todas" || period !== "all" || source !== "Todas" ? undefined : { items: fallbackItems, updatedAt: new Date(initialNow).toISOString(), sourceCount: 0, isFallback: true },
+    fallbackData: showFallback ? { items: fallbackItems, updatedAt: new Date(now).toISOString(), sourceCount: 0, isFallback: true } : undefined,
     keepPreviousData: true,
   })
 
   useEffect(() => {
+    // Hydrating client-only persisted state (localStorage/theme) that must run after mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFavorites(JSON.parse(localStorage.getItem("orbita-favorites") ?? "{}") as Record<string, NewsItem>)
     setHistory(JSON.parse(localStorage.getItem("orbita-history") ?? "[]") as string[])
     setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light")
+    setNow(Date.now())
     const interval = window.setInterval(() => setNow(Date.now()), 60000)
     return () => window.clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return
+      event.preventDefault()
+      searchRef.current?.focus()
+    }
+    window.addEventListener("keydown", handleShortcut)
+    return () => window.removeEventListener("keydown", handleShortcut)
   }, [])
 
   useEffect(() => {
@@ -151,7 +205,7 @@ export function NewsDashboard({ initialNow }: { initialNow: number }) {
       </div>
       <div className="mx-auto max-w-7xl px-5 pb-4 md:px-8">
         <div className="flex gap-2">
-          <label className="flex min-w-0 flex-1 items-center gap-3 rounded-full border bg-muted px-4 py-3 focus-within:ring-2 focus-within:ring-ring"><Search className="size-5 text-muted-foreground" /><span className="sr-only">Pesquisar notícias em toda a internet</span><input value={input} onChange={(event) => setInput(event.target.value)} type="search" className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder="Pesquise qualquer assunto, lugar ou pessoa..." />{input && <button type="button" onClick={() => setInput("")} aria-label="Limpar pesquisa"><X className="size-4" /></button>}</label>
+          <label className="flex min-w-0 flex-1 items-center gap-3 rounded-full border bg-muted px-4 py-3 focus-within:ring-2 focus-within:ring-ring"><Search className="size-5 text-muted-foreground" /><span className="sr-only">Pesquisar notícias em toda a internet</span><input ref={searchRef} value={input} onChange={(event) => setInput(event.target.value)} type="search" className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder="Pesquise qualquer assunto, lugar ou pessoa... (atalho: /)" />{input && <button type="button" onClick={() => setInput("")} aria-label="Limpar pesquisa"><X className="size-4" /></button>}</label>
           <IconButton label="Abrir filtros" active={filtersOpen} onClick={() => setFiltersOpen((open) => !open)}><SlidersHorizontal className="size-4" /></IconButton>
           <IconButton label="Ver favoritos" active={favoritesOnly} onClick={() => setFavoritesOnly((value) => !value)}><Bookmark className="size-4" /></IconButton>
         </div>
@@ -169,11 +223,11 @@ export function NewsDashboard({ initialNow }: { initialNow: number }) {
     <nav aria-label="Categorias" className="border-b"><div className="mx-auto flex max-w-7xl overflow-x-auto px-5 md:px-8">{NEWS_CATEGORIES.map((item) => <button key={item} type="button" onClick={() => { setCategory(item); setFavoritesOnly(false) }} aria-pressed={category === item} className="shrink-0 border-b-2 border-transparent px-4 py-4 text-xs font-bold uppercase tracking-widest text-muted-foreground aria-pressed:border-primary aria-pressed:text-foreground">{item}</button>)}</div></nav>
 
     <main id="conteudo" className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-8 md:px-8">
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b-2 border-primary pb-4"><div><p className="text-xs font-bold uppercase tracking-widest text-destructive">{favoritesOnly ? "Sua coleção" : query ? "Pesquisa global" : "Edição contínua"}</p><h1 className="text-balance font-serif text-3xl font-bold">{favoritesOnly ? "Favoritos" : query ? `Resultados para “${query}”` : "Notícias em destaque"}</h1></div><div className="flex items-center gap-2 text-xs text-muted-foreground"><Clock3 className="size-4" />{isLoading || isValidating ? "Buscando..." : `${items.length} matérias · ${timeFormatter.format(new Date(data?.updatedAt ?? now))}`}</div></div>
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b-2 border-primary pb-4"><div><p className="text-xs font-bold uppercase tracking-widest text-destructive">{favoritesOnly ? "Sua coleção" : query ? "Pesquisa global" : "Edição contínua"}</p><h1 className="text-balance font-serif text-3xl font-bold">{favoritesOnly ? "Favoritos" : query ? `Resultados para “${query}”` : "Notícias em destaque"}</h1></div><div className="flex items-center gap-2 text-xs text-muted-foreground"><Clock3 className="size-4" />{isLoading || isValidating ? "Buscando..." : `${items.length} matérias · ${timeFormatter.format(new Date(data?.updatedAt ?? now ?? 0))}`}</div></div>
       {notice && <div role="status" aria-live="polite" className="flex items-center gap-2 rounded-lg border bg-muted p-3 text-sm"><Check className="size-4" />{notice}</div>}
       {error && <p role="alert" className="rounded-lg border bg-muted p-4 text-sm">A busca está temporariamente indisponível. Tente novamente.</p>}
       {!isLoading && items.length === 0 ? <div className="flex min-h-64 flex-col items-center justify-center gap-4 rounded-xl border bg-muted p-8 text-center"><Search className="size-7" /><h2 className="font-serif text-2xl font-bold">Nenhuma notícia encontrada</h2><p className="max-w-md text-sm text-muted-foreground">Tente usar menos palavras, outro período ou limpar os filtros.</p><button type="button" onClick={clear} className="rounded-full bg-primary px-5 py-2 text-sm font-bold text-primary-foreground">Limpar tudo</button></div> : <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,0.65fr)]"><section className="flex flex-col">{items.map((item, index) => <NewsCard key={item.id} item={item} now={now} query={query} lead={index === 0 && !query && !favoritesOnly} favorite={Boolean(favorites[item.id])} onFavorite={() => toggleFavorite(item)} onShare={() => void share(item)} />)}</section><aside className="h-fit rounded-xl bg-primary p-6 text-primary-foreground lg:sticky lg:top-40"><p className="text-xs font-bold uppercase tracking-widest opacity-60">Explore melhor</p><h2 className="mt-3 font-serif text-3xl font-bold">O mundo em perspectiva.</h2><p className="mt-4 text-sm leading-relaxed opacity-70">Pesquise notícias indexadas pelo Google News, filtre por período e salve matérias importantes neste navegador.</p><button type="button" onClick={clear} className="mt-6 rounded-full border border-primary-foreground/30 px-4 py-2 text-xs font-bold">Limpar busca e filtros</button></aside></div>}
     </main>
-    <footer className="border-t"><div className="mx-auto flex max-w-7xl justify-between gap-4 px-5 py-8 text-xs text-muted-foreground md:px-8"><p>© {new Date(now).getFullYear()} Órbita Notícias</p><p>Resultados via RSS público e Google News.</p></div></footer>
+    <footer className="border-t"><div className="mx-auto flex max-w-7xl justify-between gap-4 px-5 py-8 text-xs text-muted-foreground md:px-8"><p>© {CURRENT_YEAR} Órbita Notícias</p><p>Resultados via RSS público e Google News.</p></div></footer>
   </div>
 }
