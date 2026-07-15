@@ -114,16 +114,29 @@ export const FALLBACK_NEWS: NewsItem[] = [
   },
 ]
 
-export function plainText(value: unknown): string {
-  if (typeof value !== "string") return ""
+export function decodeEntities(value: string): string {
   return value
-    .replace(/<[^>]*>/g, " ")
     .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;|&apos;/g, "'")
-    .replace(/\s+/g, " ")
-    .trim()
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex: string) => String.fromCodePoint(Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(Number.parseInt(dec, 10)))
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+}
+
+export function plainText(value: unknown): string {
+  if (typeof value !== "string") return ""
+  let text = value
+  // Some feeds (e.g. Agência Brasil) double-encode embedded HTML, so the
+  // literal tags only appear as "&lt;p&gt;" instead of "<p>" after the XML
+  // parser's own single pass of entity decoding. Decode entities and strip
+  // any resulting tags across two passes to unwrap that safely.
+  for (let pass = 0; pass < 2; pass += 1) {
+    text = decodeEntities(text).replace(/<[^>]*>/g, " ")
+  }
+  return text.replace(/\s+/g, " ").trim()
 }
 
 export function stableId(value: string): string {

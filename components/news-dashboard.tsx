@@ -2,7 +2,7 @@
 
 import useSWR from "swr"
 import { Bookmark, Check, Clock3, ExternalLink, Heart, Moon, RefreshCw, Search, Share2, SlidersHorizontal, Sun, X } from "lucide-react"
-import { Fragment, useEffect, useMemo, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { FALLBACK_NEWS, NEWS_CATEGORIES, type NewsCategory, type NewsItem, type NewsResponse } from "@/lib/news"
 
 const fetcher = async (url: string): Promise<NewsResponse> => {
@@ -48,8 +48,27 @@ function Actions({ item, favorite, toggleFavorite, share }: { item: NewsItem; fa
   </div>
 }
 
+function NewsImage({ src, lead }: { src: string; lead?: boolean }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return null
+  // Plain <img> is intentional: these come from arbitrary, unvetted RSS
+  // feed domains. next/image's optimizer would have the server itself
+  // fetch that external URL (an SSRF surface), so images are fetched
+  // client-side only.
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img
+    src={src}
+    alt=""
+    loading="lazy"
+    decoding="async"
+    referrerPolicy="no-referrer"
+    onError={() => setFailed(true)}
+    className={lead ? "aspect-video w-full rounded-lg object-cover" : "aspect-square size-20 shrink-0 rounded-lg object-cover sm:size-24"}
+  />
+}
+
 function NewsCard({ item, now, query, favorite, onFavorite, onShare, lead = false }: { item: NewsItem; now: number | null; query: string; favorite: boolean; onFavorite: () => void; onShare: () => void; lead?: boolean }) {
-  return <article className={lead ? "flex flex-col gap-5 rounded-xl bg-primary p-6 text-primary-foreground md:p-9" : "flex flex-col gap-4 border-b py-6 last:border-0"}>
+  const content = <>
     <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider opacity-70">
       <span>{item.category}</span><span aria-hidden="true">•</span><span>{item.source}</span><span aria-hidden="true">•</span><time dateTime={item.publishedAt}>{relativeTime(item.publishedAt, now)}</time>
     </div>
@@ -59,10 +78,23 @@ function NewsCard({ item, now, query, favorite, onFavorite, onShare, lead = fals
       <span className="text-xs opacity-60">Fonte original</span>
       <Actions item={item} favorite={favorite} toggleFavorite={onFavorite} share={onShare} />
     </div>
+  </>
+
+  if (lead) {
+    return <article className="flex flex-col gap-5 rounded-xl bg-primary p-6 text-primary-foreground md:p-9">
+      {item.image && <NewsImage src={item.image} lead />}
+      {content}
+    </article>
+  }
+
+  return <article className="flex gap-4 border-b py-6 last:border-0">
+    {item.image && <NewsImage src={item.image} />}
+    <div className="flex min-w-0 flex-1 flex-col gap-4">{content}</div>
   </article>
 }
 
 export function NewsDashboard() {
+  const searchRef = useRef<HTMLInputElement>(null)
   const [now, setNow] = useState<number | null>(null)
   const [input, setInput] = useState("")
   const [query, setQuery] = useState("")
@@ -105,6 +137,18 @@ export function NewsDashboard() {
     setNow(Date.now())
     const interval = window.setInterval(() => setNow(Date.now()), 60000)
     return () => window.clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return
+      event.preventDefault()
+      searchRef.current?.focus()
+    }
+    window.addEventListener("keydown", handleShortcut)
+    return () => window.removeEventListener("keydown", handleShortcut)
   }, [])
 
   useEffect(() => {
@@ -161,7 +205,7 @@ export function NewsDashboard() {
       </div>
       <div className="mx-auto max-w-7xl px-5 pb-4 md:px-8">
         <div className="flex gap-2">
-          <label className="flex min-w-0 flex-1 items-center gap-3 rounded-full border bg-muted px-4 py-3 focus-within:ring-2 focus-within:ring-ring"><Search className="size-5 text-muted-foreground" /><span className="sr-only">Pesquisar notícias em toda a internet</span><input value={input} onChange={(event) => setInput(event.target.value)} type="search" className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder="Pesquise qualquer assunto, lugar ou pessoa..." />{input && <button type="button" onClick={() => setInput("")} aria-label="Limpar pesquisa"><X className="size-4" /></button>}</label>
+          <label className="flex min-w-0 flex-1 items-center gap-3 rounded-full border bg-muted px-4 py-3 focus-within:ring-2 focus-within:ring-ring"><Search className="size-5 text-muted-foreground" /><span className="sr-only">Pesquisar notícias em toda a internet</span><input ref={searchRef} value={input} onChange={(event) => setInput(event.target.value)} type="search" className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder="Pesquise qualquer assunto, lugar ou pessoa... (atalho: /)" />{input && <button type="button" onClick={() => setInput("")} aria-label="Limpar pesquisa"><X className="size-4" /></button>}</label>
           <IconButton label="Abrir filtros" active={filtersOpen} onClick={() => setFiltersOpen((open) => !open)}><SlidersHorizontal className="size-4" /></IconButton>
           <IconButton label="Ver favoritos" active={favoritesOnly} onClick={() => setFavoritesOnly((value) => !value)}><Bookmark className="size-4" /></IconButton>
         </div>

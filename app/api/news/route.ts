@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import {
   FALLBACK_NEWS,
   FEED_SOURCES,
+  decodeEntities,
   inferCategory,
   plainText,
   stableId,
@@ -11,7 +12,31 @@ import {
   type NewsResponse,
 } from "@/lib/news"
 
+const HTTPS_URL = /^https:\/\//i
+
 export const revalidate = 300
+
+// Best-effort per-instance rate limiting. This resets whenever the serverless
+// function instance recycles, so it's a defense against casual abuse (e.g. a
+// misbehaving script hammering the endpoint), not a hard guarantee across a
+// multi-instance deployment. Use an edge rate limiter (Vercel Firewall, KV,
+// Upstash) for that.
+const RATE_LIMIT_WINDOW_MS = 60_000
+const RATE_LIMIT_MAX_REQUESTS = 30
+const requestLog = new Map<string, number[]>()
+
+function isRateLimited(clientId: string): boolean {
+  const now = Date.now()
+  if (Math.random() < 0.02) {
+    for (const [key, timestamps] of requestLog) {
+      if (timestamps.every((timestamp) => now - timestamp >= RATE_LIMIT_WINDOW_MS)) requestLog.delete(key)
+    }
+  }
+  const recent = (requestLog.get(clientId) ?? []).filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS)
+  recent.push(now)
+  requestLog.set(clientId, recent)
+  return recent.length > RATE_LIMIT_MAX_REQUESTS
+}
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -39,15 +64,19 @@ function findImage(item: Record<string, unknown>): string | null {
   const mediaItem = asArray(item["media:content"] ?? item["media:thumbnail"])[0]
   if (mediaItem && typeof mediaItem === "object") {
     const url = (mediaItem as Record<string, unknown>)["@_url"]
-    if (typeof url === "string" && /^https?:\/\//.test(url)) return url
+    if (typeof url === "string" && HTTPS_URL.test(url)) return url
   }
   const enclosure = asArray(item.enclosure)[0]
   if (enclosure && typeof enclosure === "object") {
     const url = (enclosure as Record<string, unknown>)["@_url"]
-    if (typeof url === "string") return url
+    if (typeof url === "string" && HTTPS_URL.test(url)) return url
   }
-  const html = textValue(item.description ?? item["content:encoded"] ?? item.content)
-  return html.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1] ?? null
+  // Some feeds (e.g. Agência Brasil) double-encode embedded HTML, so decode
+  // entities before looking for an <img> tag, same as plainText() does.
+  const rawHtml = textValue(item.description ?? item["content:encoded"] ?? item.content)
+  const html = decodeEntities(decodeEntities(rawHtml))
+  const src = html.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1] ?? null
+  return src && HTTPS_URL.test(src) ? src : null
 }
 
 function findLink(item: Record<string, unknown>): string {
@@ -118,6 +147,13 @@ function relevance(item: NewsItem, terms: string[]) {
 }
 
 export async function GET(request: NextRequest) {
+  const clientId = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown"
+  if (isRateLimited(clientId)) {
+    return NextResponse.json(
+      { error: "Muitas requisições. Tente novamente em instantes." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    )
+  }
   const params = request.nextUrl.searchParams
   const query = plainText(params.get("q") ?? "").slice(0, 120)
   const category = plainText(params.get("category") ?? "Todas")
