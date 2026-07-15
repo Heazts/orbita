@@ -23,6 +23,21 @@ const RATE_LIMIT_WINDOW_MS = 60_000
 const RATE_LIMIT_MAX_REQUESTS = 30
 const requestLog = new Map<string, number[]>()
 
+// x-real-ip is set by the edge proxy from the actual TCP connection and can't be
+// spoofed by the client. x-forwarded-for can have attacker-supplied entries
+// prepended, but the proxy appends the real client IP as the *last* entry — so
+// that's the one to trust, never the first.
+function clientIp(request: NextRequest): string {
+  const realIp = request.headers.get("x-real-ip")
+  if (realIp) return realIp.trim()
+  const forwarded = request.headers.get("x-forwarded-for")
+  if (forwarded) {
+    const ips = forwarded.split(",").map((ip) => ip.trim()).filter(Boolean)
+    if (ips.length) return ips[ips.length - 1]
+  }
+  return "unknown"
+}
+
 function isRateLimited(clientId: string): boolean {
   const now = Date.now()
   if (Math.random() < 0.02) {
@@ -155,7 +170,7 @@ function relevance(item: NewsItem, terms: string[]) {
 }
 
 export async function GET(request: NextRequest) {
-  const clientId = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown"
+  const clientId = clientIp(request)
   if (isRateLimited(clientId)) {
     return NextResponse.json(
       { error: "Muitas requisições. Tente novamente em instantes." },
