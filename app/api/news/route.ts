@@ -60,23 +60,37 @@ function textValue(value: unknown): string {
   return ""
 }
 
+// Reject decorative/branding images (site logos, feed badges, tracking
+// pixels, sprites) that some feeds embed as the article image. These look
+// broken as a card thumbnail. SVGs are almost always logos/icons here, never
+// real article photos, so they're rejected too.
+const DECORATIVE_IMAGE = /logo|sprite|placeholder|avatar|banner|badge|spacer|blank|pixel|1x1|feed|rss|\.svg(\?|$)/i
+
+function isUsableImage(url: unknown): url is string {
+  return typeof url === "string" && HTTPS_URL.test(url) && !DECORATIVE_IMAGE.test(url)
+}
+
 function findImage(item: Record<string, unknown>): string | null {
   const mediaItem = asArray(item["media:content"] ?? item["media:thumbnail"])[0]
   if (mediaItem && typeof mediaItem === "object") {
     const url = (mediaItem as Record<string, unknown>)["@_url"]
-    if (typeof url === "string" && HTTPS_URL.test(url)) return url
+    if (isUsableImage(url)) return url
   }
   const enclosure = asArray(item.enclosure)[0]
   if (enclosure && typeof enclosure === "object") {
     const url = (enclosure as Record<string, unknown>)["@_url"]
-    if (typeof url === "string" && HTTPS_URL.test(url)) return url
+    if (isUsableImage(url)) return url
   }
   // Some feeds (e.g. Agência Brasil) double-encode embedded HTML, so decode
-  // entities before looking for an <img> tag, same as plainText() does.
+  // entities before looking for an <img> tag, same as plainText() does. Feeds
+  // often put their site logo first, so scan every <img> and take the first
+  // that isn't decorative.
   const rawHtml = textValue(item.description ?? item["content:encoded"] ?? item.content)
   const html = decodeEntities(decodeEntities(rawHtml))
-  const src = html.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1] ?? null
-  return src && HTTPS_URL.test(src) ? src : null
+  for (const match of html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)) {
+    if (isUsableImage(match[1])) return match[1]
+  }
+  return null
 }
 
 function findLink(item: Record<string, unknown>): string {
