@@ -5,6 +5,7 @@ import {
   FEED_SOURCES,
   decodeEntities,
   inferCategory,
+  normalize,
   plainText,
   stableId,
   type FeedSource,
@@ -16,11 +17,8 @@ const HTTPS_URL = /^https:\/\//i
 
 export const revalidate = 300
 
-// Best-effort per-instance rate limiting. This resets whenever the serverless
-// function instance recycles, so it's a defense against casual abuse (e.g. a
-// misbehaving script hammering the endpoint), not a hard guarantee across a
-// multi-instance deployment. Use an edge rate limiter (Vercel Firewall, KV,
-// Upstash) for that.
+// Best-effort per-instance rate limiting against casual abuse. Not a hard
+// guarantee across instances — use an edge rate limiter for that.
 const RATE_LIMIT_WINDOW_MS = 60_000
 const RATE_LIMIT_MAX_REQUESTS = 30
 const requestLog = new Map<string, number[]>()
@@ -60,10 +58,8 @@ function textValue(value: unknown): string {
   return ""
 }
 
-// Reject decorative/branding images (site logos, feed badges, tracking
-// pixels, sprites) that some feeds embed as the article image. These look
-// broken as a card thumbnail. SVGs are almost always logos/icons here, never
-// real article photos, so they're rejected too.
+// Reject site logos, badges, tracking pixels and SVGs that some feeds embed
+// as the article image — they render as broken-looking thumbnails.
 const DECORATIVE_IMAGE = /logo|sprite|placeholder|avatar|banner|badge|spacer|blank|pixel|1x1|feed|rss|\.svg(\?|$)/i
 
 function isUsableImage(url: unknown): url is string {
@@ -81,10 +77,8 @@ function findImage(item: Record<string, unknown>): string | null {
     const url = (enclosure as Record<string, unknown>)["@_url"]
     if (isUsableImage(url)) return url
   }
-  // Some feeds (e.g. Agência Brasil) double-encode embedded HTML, so decode
-  // entities before looking for an <img> tag, same as plainText() does. Feeds
-  // often put their site logo first, so scan every <img> and take the first
-  // that isn't decorative.
+  // Decode double-encoded HTML, then take the first non-decorative <img>
+  // (feeds often put their logo first).
   const rawHtml = textValue(item.description ?? item["content:encoded"] ?? item.content)
   const html = decodeEntities(decodeEntities(rawHtml))
   for (const match of html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)) {
@@ -155,8 +149,8 @@ async function searchGoogle(query: string): Promise<NewsItem[]> {
 }
 
 function relevance(item: NewsItem, terms: string[]) {
-  const title = item.title.toLocaleLowerCase("pt-BR")
-  const body = `${item.description} ${item.source}`.toLocaleLowerCase("pt-BR")
+  const title = normalize(item.title)
+  const body = normalize(`${item.description} ${item.source}`)
   return terms.reduce((score, term) => score + (title.includes(term) ? 5 : 0) + (body.includes(term) ? 2 : 0), 0)
 }
 
@@ -180,11 +174,15 @@ export async function GET(request: NextRequest) {
   if (query) {
     try { googleItems = await searchGoogle(query) } catch { googleItems = [] }
   }
-  const terms = query.toLocaleLowerCase("pt-BR").split(/\s+/).filter((term) => term.length > 1)
+  // Google already matched the query on its side, so keep every Google result;
+  // only local feed items need the accent-insensitive relevance check. This
+  // stops valid results from disappearing when the query omits accents.
+  const googleUrls = new Set(googleItems.map((item) => item.url))
+  const terms = normalize(query).split(/\s+/).filter((term) => term.length > 1)
   const cutoff = period ? Date.now() - period * 86_400_000 : 0
   const combined = [...googleItems, ...localItems]
   const unique = Array.from(new Map(combined.map((item) => [item.url, item])).values())
-    .filter((item) => !query || relevance(item, terms) > 0)
+    .filter((item) => !query || googleUrls.has(item.url) || relevance(item, terms) > 0)
     .filter((item) => category === "Todas" || item.category === category)
     .filter((item) => source === "Todas" || item.source === source)
     .filter((item) => !cutoff || Date.parse(item.publishedAt) >= cutoff)

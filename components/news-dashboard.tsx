@@ -1,7 +1,7 @@
 "use client"
 
 import useSWR from "swr"
-import { Bookmark, Check, Clock3, ExternalLink, Heart, Moon, RefreshCw, Search, Share2, SlidersHorizontal, Sun, X } from "lucide-react"
+import { ArrowUp, Bookmark, Check, Clock3, ExternalLink, Heart, Moon, RefreshCw, Search, Share2, SlidersHorizontal, Sun, X } from "lucide-react"
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { FALLBACK_NEWS, NEWS_CATEGORIES, type NewsCategory, type NewsItem, type NewsResponse } from "@/lib/news"
 
@@ -9,6 +9,23 @@ const fetcher = async (url: string): Promise<NewsResponse> => {
   const response = await fetch(url)
   if (!response.ok) throw new Error("Não foi possível pesquisar agora.")
   return response.json()
+}
+
+function readStore<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as T) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function writeStore(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, typeof value === "string" ? value : JSON.stringify(value))
+  } catch {
+    // Private mode or quota exceeded — persistence is best-effort.
+  }
 }
 
 const timeFormatter = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })
@@ -53,10 +70,8 @@ function Actions({ item, favorite, toggleFavorite, share }: { item: NewsItem; fa
 function NewsImage({ src, lead }: { src: string; lead?: boolean }) {
   const [failed, setFailed] = useState(false)
   if (failed) return null
-  // Plain <img> is intentional: these come from arbitrary, unvetted RSS
-  // feed domains. next/image's optimizer would have the server itself
-  // fetch that external URL (an SSRF surface), so images are fetched
-  // client-side only.
+  // Plain <img>, not next/image: these URLs come from arbitrary feed domains
+  // and next/image's optimizer would make the server fetch them (SSRF surface).
   // eslint-disable-next-line @next/next/no-img-element
   return <img
     src={src}
@@ -67,6 +82,18 @@ function NewsImage({ src, lead }: { src: string; lead?: boolean }) {
     onError={() => setFailed(true)}
     className={lead ? "aspect-video w-full rounded-lg object-cover" : "aspect-square size-20 shrink-0 rounded-lg object-cover sm:size-24"}
   />
+}
+
+function SkeletonCard({ lead }: { lead?: boolean }) {
+  return <div className={`motion-safe:animate-pulse ${lead ? "flex flex-col gap-4 rounded-xl bg-muted p-6 md:p-9" : "flex gap-4 border-b py-6"}`} aria-hidden="true">
+    {!lead && <div className="size-20 shrink-0 rounded-lg bg-foreground/10 sm:size-24" />}
+    <div className="flex flex-1 flex-col gap-3">
+      <div className="h-3 w-40 rounded bg-foreground/10" />
+      <div className={`rounded bg-foreground/10 ${lead ? "h-9 w-4/5" : "h-6 w-3/4"}`} />
+      <div className="h-3 w-full rounded bg-foreground/10" />
+      <div className="h-3 w-2/3 rounded bg-foreground/10" />
+    </div>
+  </div>
 }
 
 function NewsCard({ item, now, query, favorite, onFavorite, onShare, lead = false }: { item: NewsItem; now: number | null; query: string; favorite: boolean; onFavorite: () => void; onShare: () => void; lead?: boolean }) {
@@ -110,6 +137,7 @@ export function NewsDashboard() {
   const [history, setHistory] = useState<string[]>([])
   const [theme, setTheme] = useState<"light" | "dark">("light")
   const [notice, setNotice] = useState("")
+  const [showTop, setShowTop] = useState(false)
   const fallbackItems = useMemo(
     () => (now === null ? [] : FALLBACK_NEWS.map((item, index) => ({ ...item, publishedAt: new Date(now - index * 1800000).toISOString() }))),
     [now],
@@ -131,10 +159,10 @@ export function NewsDashboard() {
   })
 
   useEffect(() => {
-    // Hydrating client-only persisted state (localStorage/theme) that must run after mount.
+    // Hydrate client-only persisted state after mount.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFavorites(JSON.parse(localStorage.getItem("orbita-favorites") ?? "{}") as Record<string, NewsItem>)
-    setHistory(JSON.parse(localStorage.getItem("orbita-history") ?? "[]") as string[])
+    setFavorites(readStore<Record<string, NewsItem>>("orbita-favorites", {}))
+    setHistory(readStore<string[]>("orbita-history", []))
     setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light")
     setNow(Date.now())
     const interval = window.setInterval(() => setNow(Date.now()), 60000)
@@ -154,13 +182,19 @@ export function NewsDashboard() {
   }, [])
 
   useEffect(() => {
+    const onScroll = () => setShowTop(window.scrollY > 600)
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [])
+
+  useEffect(() => {
     const timeout = window.setTimeout(() => {
       const next = input.trim()
       setQuery(next)
       if (next.length > 1) {
         setHistory((current) => {
           const updated = [next, ...current.filter((term) => term.toLocaleLowerCase("pt-BR") !== next.toLocaleLowerCase("pt-BR"))].slice(0, 6)
-          localStorage.setItem("orbita-history", JSON.stringify(updated))
+          writeStore("orbita-history", updated)
           return updated
         })
       }
@@ -170,12 +204,13 @@ export function NewsDashboard() {
 
   const sources = useMemo(() => ["Todas", ...Array.from(new Set((data?.items ?? []).map((item) => item.source))).sort()], [data?.items])
   const items = favoritesOnly ? Object.values(favorites).sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt)) : data?.items ?? []
+  const favoritesCount = Object.keys(favorites).length
   const toggleFavorite = (item: NewsItem) => {
     setFavorites((current) => {
       const next = { ...current }
       if (next[item.id]) delete next[item.id]
       else next[item.id] = item
-      localStorage.setItem("orbita-favorites", JSON.stringify(next))
+      writeStore("orbita-favorites", next)
       return next
     })
   }
@@ -190,7 +225,7 @@ export function NewsDashboard() {
     const next = theme === "dark" ? "light" : "dark"
     document.documentElement.classList.remove("light", "dark")
     document.documentElement.classList.add(next)
-    localStorage.setItem("orbita-theme", next)
+    writeStore("orbita-theme", next)
     setTheme(next)
   }
   const clear = () => { setInput(""); setQuery(""); setCategory("Todas"); setPeriod("all"); setSort("latest"); setSource("Todas"); setFavoritesOnly(false) }
@@ -209,7 +244,10 @@ export function NewsDashboard() {
         <div className="flex gap-2">
           <label className="flex min-w-0 flex-1 items-center gap-3 rounded-full border bg-muted px-4 py-3 focus-within:ring-2 focus-within:ring-ring"><Search className="size-5 text-muted-foreground" /><span className="sr-only">Pesquisar notícias em toda a internet</span><input ref={searchRef} value={input} onChange={(event) => setInput(event.target.value)} type="search" className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder="Pesquise qualquer assunto, lugar ou pessoa... (atalho: /)" />{input && <button type="button" onClick={() => setInput("")} aria-label="Limpar pesquisa"><X className="size-4" /></button>}</label>
           <IconButton label="Abrir filtros" active={filtersOpen} onClick={() => setFiltersOpen((open) => !open)}><SlidersHorizontal className="size-4" /></IconButton>
-          <IconButton label="Ver favoritos" active={favoritesOnly} onClick={() => setFavoritesOnly((value) => !value)}><Bookmark className="size-4" /></IconButton>
+          <div className="relative">
+            <IconButton label="Ver favoritos" active={favoritesOnly} onClick={() => setFavoritesOnly((value) => !value)}><Bookmark className="size-4" /></IconButton>
+            {favoritesCount > 0 && <span aria-hidden="true" className="pointer-events-none absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">{favoritesCount > 99 ? "99+" : favoritesCount}</span>}
+          </div>
         </div>
         {!query && <div className="mt-3 flex gap-2 overflow-x-auto pb-1">{[...history, ...SUGGESTIONS].filter((term, index, all) => all.indexOf(term) === index).slice(0, 8).map((term) => <button key={term} type="button" onClick={() => setInput(term)} className="shrink-0 rounded-full border px-3 py-1.5 text-xs hover:bg-muted">{term}</button>)}</div>}
         {filtersOpen && <div className="mt-3 grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-3">
@@ -228,8 +266,9 @@ export function NewsDashboard() {
       <div className="flex flex-wrap items-end justify-between gap-4 border-b-2 border-primary pb-4"><div><p className="text-xs font-bold uppercase tracking-widest text-destructive">{favoritesOnly ? "Sua coleção" : query ? "Pesquisa global" : "Edição contínua"}</p><h1 className="text-balance font-serif text-3xl font-bold">{favoritesOnly ? "Favoritos" : query ? `Resultados para “${query}”` : "Notícias em destaque"}</h1></div><div className="flex items-center gap-2 text-xs text-muted-foreground"><Clock3 className="size-4" />{isLoading || isValidating ? "Buscando..." : `${items.length} matérias · ${timeFormatter.format(new Date(data?.updatedAt ?? now ?? 0))}`}</div></div>
       {notice && <div role="status" aria-live="polite" className="flex items-center gap-2 rounded-lg border bg-muted p-3 text-sm"><Check className="size-4" />{notice}</div>}
       {error && <p role="alert" className="rounded-lg border bg-muted p-4 text-sm">A busca está temporariamente indisponível. Tente novamente.</p>}
-      {!isLoading && items.length === 0 ? <div className="flex min-h-64 flex-col items-center justify-center gap-4 rounded-xl border bg-muted p-8 text-center"><Search className="size-7" /><h2 className="font-serif text-2xl font-bold">Nenhuma notícia encontrada</h2><p className="max-w-md text-sm text-muted-foreground">Tente usar menos palavras, outro período ou limpar os filtros.</p><button type="button" onClick={clear} className="rounded-full bg-primary px-5 py-2 text-sm font-bold text-primary-foreground">Limpar tudo</button></div> : <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,0.65fr)]"><section className="flex flex-col">{items.map((item, index) => <NewsCard key={item.id} item={item} now={now} query={query} lead={index === 0 && !query && !favoritesOnly} favorite={Boolean(favorites[item.id])} onFavorite={() => toggleFavorite(item)} onShare={() => void share(item)} />)}</section><aside className="h-fit rounded-xl bg-primary p-6 text-primary-foreground lg:sticky lg:top-40"><p className="text-xs font-bold uppercase tracking-widest opacity-60">Explore melhor</p><h2 className="mt-3 font-serif text-3xl font-bold">O mundo em perspectiva.</h2><p className="mt-4 text-sm leading-relaxed opacity-70">Pesquise notícias indexadas pelo Google News, filtre por período e salve matérias importantes neste navegador.</p><button type="button" onClick={clear} className="mt-6 rounded-full border border-primary-foreground/30 px-4 py-2 text-xs font-bold">Limpar busca e filtros</button></aside></div>}
+      {isLoading && items.length === 0 ? <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,0.65fr)]"><section className="flex flex-col gap-2">{!query && !favoritesOnly && <SkeletonCard lead />}{Array.from({ length: 5 }).map((_, index) => <SkeletonCard key={index} />)}</section></div> : items.length === 0 ? <div className="flex min-h-64 flex-col items-center justify-center gap-4 rounded-xl border bg-muted p-8 text-center"><Search className="size-7" /><h2 className="font-serif text-2xl font-bold">Nenhuma notícia encontrada</h2><p className="max-w-md text-sm text-muted-foreground">Tente usar menos palavras, outro período ou limpar os filtros.</p><button type="button" onClick={clear} className="rounded-full bg-primary px-5 py-2 text-sm font-bold text-primary-foreground">Limpar tudo</button></div> : <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,0.65fr)]"><section className="flex flex-col">{items.map((item, index) => <NewsCard key={item.id} item={item} now={now} query={query} lead={index === 0 && !query && !favoritesOnly} favorite={Boolean(favorites[item.id])} onFavorite={() => toggleFavorite(item)} onShare={() => void share(item)} />)}</section><aside className="h-fit rounded-xl bg-primary p-6 text-primary-foreground lg:sticky lg:top-40"><p className="text-xs font-bold uppercase tracking-widest opacity-60">Explore melhor</p><h2 className="mt-3 font-serif text-3xl font-bold">O mundo em perspectiva.</h2><p className="mt-4 text-sm leading-relaxed opacity-70">Pesquise notícias indexadas pelo Google News, filtre por período e salve matérias importantes neste navegador.</p><button type="button" onClick={clear} className="mt-6 rounded-full border border-primary-foreground/30 px-4 py-2 text-xs font-bold">Limpar busca e filtros</button></aside></div>}
     </main>
     <footer className="border-t"><div className="mx-auto flex max-w-7xl justify-between gap-4 px-5 py-8 text-xs text-muted-foreground md:px-8"><p>© {CURRENT_YEAR} Órbita Notícias</p><p>Resultados via RSS público e Google News.</p></div></footer>
+    {showTop && <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Voltar ao topo" className="fixed bottom-6 right-6 z-30 flex size-11 items-center justify-center rounded-full border border-border bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><ArrowUp className="size-5" /></button>}
   </div>
 }

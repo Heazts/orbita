@@ -44,14 +44,16 @@ A interface é mobile-first com Tailwind (`sm:`/`md:`/`lg:`), testada em 320px, 
 ## Funcionalidades
 
 - Agrega BBC Brasil, DW Brasil, Euronews, Agência Brasil, Olhar Digital e NASA, com busca global via Google News.
-- Filtros por categoria, período, fonte e ordenação (mais recentes/mais relevantes); favoritos e histórico de busca persistidos em `localStorage`.
+- Busca insensível a acentos (ex.: "eleicao" encontra "eleição") que sempre preserva os resultados do Google.
+- Filtros por categoria, período, fonte e ordenação (mais recentes/mais relevantes); favoritos (com contador) e histórico de busca persistidos em `localStorage`.
 - Miniaturas de imagem nas notícias quando o feed original fornece uma (com fallback silencioso se a imagem não carregar).
-- Atalho de teclado `/` para focar a busca de qualquer lugar da página.
+- Estados de carregamento com skeletons, botão "voltar ao topo" e atalho de teclado `/` para focar a busca.
 - Tema claro/escuro (incluindo um modo escuro bem próximo do preto) com persistência da preferência do usuário.
 
 ## Segurança
 
-- **Cabeçalhos HTTP**: `next.config.mjs` define `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy` e `Permissions-Policy` para todas as rotas.
+- **Cabeçalhos HTTP**: `next.config.mjs` define `Content-Security-Policy`, `Strict-Transport-Security` (HSTS), `Cross-Origin-Opener-Policy`, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy` e `Permissions-Policy` para todas as rotas. `X-Powered-By` é desativado para não expor o framework.
+- **Automação (GitHub)**: Dependabot (`.github/dependabot.yml`) para atualizações de dependências, análise de código com CodeQL e um workflow de CI (lint + build) em `.github/workflows/`.
 - **Rate limiting**: a rota `/api/news` limita a ~30 requisições/minuto por IP (best-effort, em memória por instância). Isso resolve o abuso casual; em produção com múltiplas instâncias, prefira um rate limit de borda (Vercel Firewall/KV, Upstash) para uma garantia mais forte.
 - **Sem SSRF**: a rota `/api/news` só faz `fetch` para uma lista fixa de feeds (`FEED_SOURCES`) e para o domínio fixo `news.google.com`; a entrada do usuário (`q`) é sempre passada como parâmetro de URL codificado, nunca como host/URL arbitrário.
 - **Sem XSS via conteúdo externo**: título/descrição das notícias são renderizados como texto pelo React (nunca `dangerouslySetInnerHTML`), então HTML vindo dos feeds não é executado. Feeds que colocam o próprio HTML duplamente escapado na descrição (visto na prática na Agência Brasil) são desembrulhados com segurança por `plainText()`/`decodeEntities()` em `lib/news.ts` antes de virar texto.
