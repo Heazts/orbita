@@ -139,7 +139,7 @@ export function NewsDashboard() {
   const [notice, setNotice] = useState("")
   const [showTop, setShowTop] = useState(false)
   const fallbackItems = useMemo(
-    () => (now === null ? [] : FALLBACK_NEWS.map((item, index) => ({ ...item, publishedAt: new Date(now - index * 1800000).toISOString() }))),
+    () => (now === null ? [] : FALLBACK_NEWS.map((item, index) => ({ ...item, publishedAt: new Date(now - index * 30 * 60_000).toISOString() }))),
     [now],
   )
 
@@ -153,7 +153,7 @@ export function NewsDashboard() {
   const apiUrl = `/api/news${queryString ? `?${queryString}` : ""}`
   const showFallback = now !== null && !query && category === "Todas" && period === "all" && source === "Todas"
   const { data, error, isLoading, isValidating, mutate } = useSWR<NewsResponse>(apiUrl, fetcher, {
-    refreshInterval: 300000,
+    refreshInterval: 5 * 60_000,
     fallbackData: showFallback ? { items: fallbackItems, updatedAt: new Date(now).toISOString(), sourceCount: 0, isFallback: true } : undefined,
     keepPreviousData: true,
   })
@@ -165,7 +165,7 @@ export function NewsDashboard() {
     setHistory(readStore<string[]>("orbita-history", []))
     setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light")
     setNow(Date.now())
-    const interval = window.setInterval(() => setNow(Date.now()), 60000)
+    const interval = window.setInterval(() => setNow(Date.now()), 60_000)
     return () => window.clearInterval(interval)
   }, [])
 
