@@ -1,0 +1,20 @@
+name: Dependency Review
+
+# Blocks pull requests that add dependencies with known vulnerabilities,
+# using GitHub's dependency graph (enabled by default on public repos).
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
