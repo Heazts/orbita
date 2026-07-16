@@ -18,6 +18,8 @@ Requer Node.js 20+ e [pnpm](https://pnpm.io/).
 pnpm install       # instala as dependências
 pnpm dev           # ambiente de desenvolvimento em http://localhost:3000
 pnpm lint          # ESLint (regras do Next.js + TypeScript)
+pnpm test          # testes unitários em modo watch (Vitest)
+pnpm test:run      # testes unitários uma vez (usado no CI)
 pnpm build         # build de produção (roda o type-check do TypeScript)
 pnpm start         # serve o build de produção
 ```
@@ -31,10 +33,13 @@ app/
   page.tsx              # ponto de entrada da página
 components/
   news-dashboard.tsx   # toda a interface e o estado do painel
-  ui/button.tsx        # componente de botão (shadcn)
 lib/
-  news.ts               # tipos, fontes de feed e utilitários de parsing
-  utils.ts              # helper de classes (cn)
+  news.ts               # tipos, fontes de feed, categorias e utilitários de texto
+  parse.ts              # parsing de RSS/Atom e cálculo de relevância (testável)
+  site.ts               # constantes do site (URL, título, descrição)
+tests/
+  news.test.ts          # testes de lib/news.ts
+  parse.test.ts         # testes de lib/parse.ts (com fixtures de feed)
 ```
 
 ## Responsividade
@@ -43,9 +48,11 @@ A interface é mobile-first com Tailwind (`sm:`/`md:`/`lg:`), testada em 320px, 
 
 ## Funcionalidades
 
-- Agrega BBC Brasil, DW Brasil, Euronews, Agência Brasil, Olhar Digital e NASA, com busca global via Google News.
-- Busca insensível a acentos (ex.: "eleicao" encontra "eleição") que sempre preserva os resultados do Google.
+- Agrega BBC Brasil, DW Brasil, Euronews, Agência Brasil, Olhar Digital, NASA, GE (Globo Esporte) e Agência Brasil Saúde, com busca global via Google News.
+- Categorias: Mundo, Política, Economia, Tecnologia, Ciência, Saúde, Esportes e Cultura, inferidas por palavra-chave a partir do título/descrição.
+- Busca insensível a acentos (ex.: "eleicao" encontra "eleição") que sempre preserva os resultados do Google. Aceita deep link `?q=termo` (também alvo do `SearchAction` no JSON-LD), gerando URLs de busca compartilháveis.
 - Filtros por categoria, período, fonte e ordenação (mais recentes/mais relevantes); favoritos (com contador) e histórico de busca persistidos em `localStorage`.
+- Quando alguma fonte de feed está indisponível, um aviso discreto lista quais fontes falharam (o payload da API expõe `failedSources`), sem quebrar o restante do painel.
 - Miniaturas de imagem nas notícias quando o feed original fornece uma (com fallback silencioso se a imagem não carregar).
 - Estados de carregamento com skeletons, botão "voltar ao topo" e atalho de teclado `/` para focar a busca.
 - Tema claro/escuro (incluindo um modo escuro bem próximo do preto) com persistência da preferência do usuário.
@@ -55,14 +62,18 @@ A interface é mobile-first com Tailwind (`sm:`/`md:`/`lg:`), testada em 320px, 
 ## Segurança
 
 - **Cabeçalhos HTTP**: `next.config.mjs` define `Content-Security-Policy`, `Strict-Transport-Security` (HSTS), `Cross-Origin-Opener-Policy`, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy` e `Permissions-Policy` para todas as rotas. `X-Powered-By` é desativado para não expor o framework.
-- **Automação (GitHub)**: Dependabot (`.github/dependabot.yml`) para atualizações de dependências, análise de código com CodeQL e um workflow de CI (lint + build) em `.github/workflows/`.
+- **Automação (GitHub)**: Dependabot (`.github/dependabot.yml`) para atualizações de dependências, análise de código com CodeQL e um workflow de CI (lint + testes + build) em `.github/workflows/`.
 - **Rate limiting**: a rota `/api/news` limita a ~30 requisições/minuto por IP (best-effort, em memória por instância). Isso resolve o abuso casual; em produção com múltiplas instâncias, prefira um rate limit de borda (Vercel Firewall/KV, Upstash) para uma garantia mais forte.
 - **Sem SSRF**: a rota `/api/news` só faz `fetch` para uma lista fixa de feeds (`FEED_SOURCES`) e para o domínio fixo `news.google.com`; a entrada do usuário (`q`) é sempre passada como parâmetro de URL codificado, nunca como host/URL arbitrário.
 - **Sem XSS via conteúdo externo**: título/descrição das notícias são renderizados como texto pelo React (nunca `dangerouslySetInnerHTML`), então HTML vindo dos feeds não é executado. Feeds que colocam o próprio HTML duplamente escapado na descrição (visto na prática na Agência Brasil) são desembrulhados com segurança por `plainText()`/`decodeEntities()` em `lib/news.ts` antes de virar texto.
 - **Imagens externas**: extraídas apenas de URLs `https://`; renderizadas com `<img>` simples (não `next/image`) de propósito — o otimizador de imagem do Next faria o próprio servidor buscar a URL externa arbitrária do feed, o que seria uma superfície de SSRF. `referrerPolicy="no-referrer"` evita vazar a origem do site para os hosts de imagem de terceiros.
 - **Dados do usuário**: favoritos, histórico de busca e tema ficam apenas em `localStorage` do navegador — nada é enviado a um servidor próprio.
 
+## Testes
+
+Testes unitários com [Vitest](https://vitest.dev/) cobrem os utilitários de texto (`lib/news.ts`: `decodeEntities`, `plainText`, `normalize`, `stableId`, `inferCategory`) e o parsing de feeds (`lib/parse.ts`: `parseFeed`, `findImage`, `findLink`, `relevance`) com fixtures de RSS/Atom e do Google News. Rode com `pnpm test` (watch) ou `pnpm test:run` (uma vez, como no CI).
+
 ## Notas
 
-- `pnpm lint` e `pnpm build` (com verificação de tipos) devem passar limpos antes de qualquer deploy.
+- `pnpm lint`, `pnpm test:run` e `pnpm build` (com verificação de tipos) devem passar limpos antes de qualquer deploy.
 - O ícone do site usa os arquivos em `public/` (`icon.svg`, `icon-light-32x32.png`, `icon-dark-32x32.png`, `apple-icon.png`), referenciados em `app/layout.tsx`.
