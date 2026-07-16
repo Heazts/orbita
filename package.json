@@ -9,7 +9,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@vercel/analytics": "2.0.1",
@@ -29,7 +31,8 @@
     "eslint-config-next": "16.2.10",
     "postcss": "^8.5.10",
     "tailwindcss": "^4.3.2",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^4.1.10"
   },
   "pnpm": {
     "overrides": {

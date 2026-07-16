@@ -5,6 +5,8 @@ export const NEWS_CATEGORIES = [
   "Economia",
   "Tecnologia",
   "Ciência",
+  "Saúde",
+  "Esportes",
   "Cultura",
 ] as const
 
@@ -26,6 +28,9 @@ export type NewsResponse = {
   updatedAt: string
   sourceCount: number
   isFallback?: boolean
+  // Names of feed sources that failed to load for this response, so the client
+  // can tell the user some sources are temporarily unavailable.
+  failedSources?: string[]
 }
 
 export type FeedSource = {
@@ -64,6 +69,16 @@ export const FEED_SOURCES: FeedSource[] = [
     name: "NASA",
     url: "https://www.nasa.gov/rss/dyn/breaking_news.rss",
     category: "Ciência",
+  },
+  {
+    name: "GE (Globo Esporte)",
+    url: "https://ge.globo.com/rss/ge/",
+    category: "Esportes",
+  },
+  {
+    name: "Agência Brasil — Saúde",
+    url: "https://agenciabrasil.ebc.com.br/rss/saude/feed.xml",
+    category: "Saúde",
   },
 ]
 
@@ -162,7 +177,9 @@ export function inferCategory(
   const normalized = title.toLocaleLowerCase("pt-BR")
   if (/econom|mercado|inflação|banco|juros|empresa|negócio/.test(normalized)) return "Economia"
   if (/tecnolog|digital|internet|inteligência artificial|software|celular/.test(normalized)) return "Tecnologia"
-  if (/ciência|espaço|nasa|pesquisa|clima|saúde|estudo/.test(normalized)) return "Ciência"
+  if (/saúde|vacina|hospital|doença|médic|remédio|sus|vírus|pandemia/.test(normalized)) return "Saúde"
+  if (/futebol|copa|olimpí|campeonato|jogador|técnico|placar|gol|esporte|atleta/.test(normalized)) return "Esportes"
+  if (/ciência|espaço|nasa|pesquisa|clima|estudo|astronomia/.test(normalized)) return "Ciência"
   if (/cultura|cinema|música|livro|arte|festival/.test(normalized)) return "Cultura"
   if (/governo|eleição|presidente|congresso|política|ministro/.test(normalized)) return "Política"
   return fallback

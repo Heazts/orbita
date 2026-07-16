@@ -63,6 +63,14 @@ const jsonLd = {
   url: SITE_URL,
   description: SITE_DESCRIPTION,
   inLanguage: "pt-BR",
+  potentialAction: {
+    "@type": "SearchAction",
+    target: {
+      "@type": "EntryPoint",
+      urlTemplate: `${SITE_URL}/?q={search_term_string}`,
+    },
+    "query-input": "required name=search_term_string",
+  },
   publisher: {
     "@type": "Organization",
     name: SITE_NAME,
