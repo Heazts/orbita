@@ -87,16 +87,19 @@ export function parseFeed(xml: string, source: FeedSource, isGoogle = false): Ne
     const googleSource = plainText(textValue(item.source))
     const title = isGoogle && googleSource ? rawTitle.replace(new RegExp(`\\s+-\\s+${googleSource.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`), "") : rawTitle
     const rawDescription = textValue(item.description ?? item.summary ?? item["content:encoded"] ?? item.content)
+    // plainText runs two decode + tag-strip passes, so compute it once and
+    // reuse it for both the snippet and category inference.
+    const description = plainText(rawDescription)
     const rawDate = textValue(item.pubDate ?? item.published ?? item.updated ?? item["dc:date"])
     const date = new Date(rawDate)
     return {
       id: stableId(url || title),
       title,
-      description: plainText(rawDescription).slice(0, 300),
+      description: description.slice(0, 300),
       url,
       image: findImage(item),
       source: googleSource || source.name,
-      category: inferCategory(`${title} ${plainText(rawDescription)}`, source.category),
+      category: inferCategory(`${title} ${description}`, source.category),
       publishedAt: Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString(),
     }
   }).filter((item): item is NewsItem => Boolean(item))

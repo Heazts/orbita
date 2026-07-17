@@ -9,41 +9,32 @@ import {
   type NewsResponse,
 } from "@/lib/news"
 import { parseFeed, relevance } from "@/lib/parse"
+import { clientIp, isRateLimited } from "@/lib/rate-limit"
 
 export const revalidate = 300
 
-// Best-effort per-instance rate limiting against casual abuse. Not a hard
-// guarantee across instances — use an edge rate limiter for that.
-const RATE_LIMIT_WINDOW_MS = 60_000
-const RATE_LIMIT_MAX_REQUESTS = 30
-const requestLog = new Map<string, number[]>()
+// Cap the feed body we buffer so a pathological (or compromised) feed can't
+// exhaust memory. The abort timeouts bound download time; this bounds size.
+const MAX_FEED_BYTES = 5_000_000
 
-// x-real-ip is set by the edge proxy from the actual TCP connection and can't be
-// spoofed by the client. x-forwarded-for can have attacker-supplied entries
-// prepended, but the proxy appends the real client IP as the *last* entry — so
-// that's the one to trust, never the first.
-function clientIp(request: NextRequest): string {
-  const realIp = request.headers.get("x-real-ip")
-  if (realIp) return realIp.trim()
-  const forwarded = request.headers.get("x-forwarded-for")
-  if (forwarded) {
-    const ips = forwarded.split(",").map((ip) => ip.trim()).filter(Boolean)
-    if (ips.length) return ips[ips.length - 1]
-  }
-  return "unknown"
-}
-
-function isRateLimited(clientId: string): boolean {
-  const now = Date.now()
-  if (Math.random() < 0.02) {
-    for (const [key, timestamps] of requestLog) {
-      if (timestamps.every((timestamp) => now - timestamp >= RATE_LIMIT_WINDOW_MS)) requestLog.delete(key)
+async function readCapped(response: Response, maxBytes: number, label: string): Promise<string> {
+  const reader = response.body?.getReader()
+  if (!reader) return response.text()
+  const decoder = new TextDecoder()
+  let text = ""
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > maxBytes) {
+      await reader.cancel()
+      throw new Error(`${label}: response exceeds ${maxBytes} bytes`)
     }
+    // stream: true keeps multi-byte characters that straddle chunk boundaries intact.
+    text += decoder.decode(value, { stream: true })
   }
-  const recent = (requestLog.get(clientId) ?? []).filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS)
-  recent.push(now)
-  requestLog.set(clientId, recent)
-  return recent.length > RATE_LIMIT_MAX_REQUESTS
+  return text + decoder.decode()
 }
 
 async function loadFeed(source: FeedSource): Promise<NewsItem[]> {
@@ -53,7 +44,7 @@ async function loadFeed(source: FeedSource): Promise<NewsItem[]> {
     signal: AbortSignal.timeout(8_000),
   })
   if (!response.ok) throw new Error(`Feed ${source.name}: ${response.status}`)
-  return parseFeed(await response.text(), source)
+  return parseFeed(await readCapped(response, MAX_FEED_BYTES, `Feed ${source.name}`), source)
 }
 
 async function searchGoogle(query: string): Promise<NewsItem[]> {
@@ -64,7 +55,7 @@ async function searchGoogle(query: string): Promise<NewsItem[]> {
     signal: AbortSignal.timeout(10_000),
   })
   if (!response.ok) throw new Error(`Google News: ${response.status}`)
-  return parseFeed(await response.text(), { name: "Google News", url, category: "Mundo" }, true)
+  return parseFeed(await readCapped(response, MAX_FEED_BYTES, "Google News"), { name: "Google News", url, category: "Mundo" }, true)
 }
 
 export async function GET(request: NextRequest) {
