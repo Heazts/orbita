@@ -4,7 +4,6 @@ import {
   inferCategory,
   normalize,
   plainText,
-  stableId,
   type FeedSource,
   type NewsItem,
 } from "@/lib/news"
@@ -93,7 +92,10 @@ export function parseFeed(xml: string, source: FeedSource, isGoogle = false): Ne
     const rawDate = textValue(item.pubDate ?? item.published ?? item.updated ?? item["dc:date"])
     const date = new Date(rawDate)
     return {
-      id: stableId(url || title),
+      // Safe to use directly: the guard above already requires a valid
+      // http(s) url, and route.ts deduplicates items by url anyway — so it's
+      // already the unique key, with none of the collision risk a hash has.
+      id: url,
       title,
       description: description.slice(0, 300),
       url,

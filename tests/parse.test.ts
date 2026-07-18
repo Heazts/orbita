@@ -112,6 +112,9 @@ describe("parseFeed", () => {
     expect(items).toHaveLength(1)
     expect(items[0].title).toBe("Notícia com imagem")
     expect(items[0].url).toBe("https://example.com/1")
+    // id is the url itself: items are already deduplicated by url downstream,
+    // so this is a collision-free identifier without needing a hash.
+    expect(items[0].id).toBe("https://example.com/1")
     expect(items[0].description).toBe("Resumo da matéria")
     expect(items[0].image).toBe("https://cdn.site.com/foto.jpg")
     expect(items[0].source).toBe("Fonte Teste")

@@ -19,8 +19,8 @@ function buildCsp(nonce: string): string {
   ].join("; ")
 }
 
-export function middleware(request: NextRequest) {
-  // btoa, not Buffer: middleware runs on the Edge runtime, which has no Node
+export function proxy(request: NextRequest) {
+  // btoa, not Buffer: the proxy runs on the Edge runtime, which has no Node
   // Buffer global.
   const nonce = btoa(crypto.randomUUID())
   const csp = buildCsp(nonce)

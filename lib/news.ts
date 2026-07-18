@@ -162,14 +162,6 @@ export function normalize(value: string): string {
   return value.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 }
 
-export function stableId(value: string): string {
-  let hash = 0
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) | 0
-  }
-  return Math.abs(hash).toString(36)
-}
-
 export function inferCategory(
   title: string,
   fallback: FeedSource["category"],

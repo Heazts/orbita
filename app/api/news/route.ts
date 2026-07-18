@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache"
 import { NextRequest, NextResponse } from "next/server"
 import {
   FALLBACK_NEWS,
@@ -19,7 +20,9 @@ const MAX_FEED_BYTES = 5_000_000
 
 async function readCapped(response: Response, maxBytes: number, label: string): Promise<string> {
   const reader = response.body?.getReader()
-  if (!reader) return response.text()
+  // No streaming body available (shouldn't happen with Node's fetch/undici):
+  // fail rather than silently falling back to an unbounded response.text().
+  if (!reader) throw new Error(`${label}: streaming body unavailable, refusing unbounded read`)
   const decoder = new TextDecoder()
   let text = ""
   let total = 0
@@ -37,25 +40,30 @@ async function readCapped(response: Response, maxBytes: number, label: string): 
   return text + decoder.decode()
 }
 
-async function loadFeed(source: FeedSource): Promise<NewsItem[]> {
-  const response = await fetch(source.url, {
-    headers: { "User-Agent": "Orbita-News/1.0" },
+async function fetchFeed(url: string, userAgent: string, timeoutMs: number, label: string): Promise<string> {
+  const response = await fetch(url, {
+    headers: { "User-Agent": userAgent },
     next: { revalidate: 300 },
-    signal: AbortSignal.timeout(8_000),
+    signal: AbortSignal.timeout(timeoutMs),
   })
-  if (!response.ok) throw new Error(`Feed ${source.name}: ${response.status}`)
-  return parseFeed(await readCapped(response, MAX_FEED_BYTES, `Feed ${source.name}`), source)
+  if (!response.ok) throw new Error(`${label}: ${response.status}`)
+  return readCapped(response, MAX_FEED_BYTES, label)
 }
+
+// Caches the *parsed* items, not just the HTTP response: Next's fetch cache
+// (above) only saves repeated network I/O. Without this, the XML parse
+// itself still reran on every request within the revalidate window.
+const loadFeedCached = unstable_cache(
+  async (source: FeedSource): Promise<NewsItem[]> =>
+    parseFeed(await fetchFeed(source.url, "Orbita-News/1.0", 8_000, `Feed ${source.name}`), source),
+  ["orbita-feed"],
+  { revalidate: 300 },
+)
 
 async function searchGoogle(query: string): Promise<NewsItem[]> {
   const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`
-  const response = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0 Orbita-News/1.0" },
-    next: { revalidate: 300 },
-    signal: AbortSignal.timeout(10_000),
-  })
-  if (!response.ok) throw new Error(`Google News: ${response.status}`)
-  return parseFeed(await readCapped(response, MAX_FEED_BYTES, "Google News"), { name: "Google News", url, category: "Mundo" }, true)
+  const xml = await fetchFeed(url, "Mozilla/5.0 Orbita-News/1.0", 10_000, "Google News")
+  return parseFeed(xml, { name: "Google News", url, category: "Mundo" }, true)
 }
 
 export async function GET(request: NextRequest) {
@@ -72,15 +80,19 @@ export async function GET(request: NextRequest) {
   const source = plainText(params.get("source") ?? "Todas")
   const period = ["1", "7", "30"].includes(params.get("period") ?? "") ? Number(params.get("period")) : 0
   const sort = params.get("sort") === "relevance" ? "relevance" : "latest"
-  const feedResults = await Promise.allSettled(FEED_SOURCES.map(loadFeed))
+
+  // Local feeds and the Google search run concurrently — previously the
+  // Google request only started after every local feed had settled, adding
+  // its own timeout on top of the slowest feed's instead of overlapping it.
+  const [feedResults, googleItems] = await Promise.all([
+    Promise.allSettled(FEED_SOURCES.map(loadFeedCached)),
+    query ? searchGoogle(query).catch(() => [] as NewsItem[]) : Promise.resolve([] as NewsItem[]),
+  ])
   const localItems = feedResults.flatMap((result) => result.status === "fulfilled" ? result.value : [])
   const failedSources = FEED_SOURCES
     .filter((_, index) => feedResults[index].status === "rejected")
     .map((feed) => feed.name)
-  let googleItems: NewsItem[] = []
-  if (query) {
-    try { googleItems = await searchGoogle(query) } catch { googleItems = [] }
-  }
+
   // Google already matched the query on its side, so keep every Google result;
   // only local feed items need the accent-insensitive relevance check. This
   // stops valid results from disappearing when the query omits accents.

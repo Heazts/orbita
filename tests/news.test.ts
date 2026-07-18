@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { decodeEntities, inferCategory, normalize, plainText, stableId } from "@/lib/news"
+import { decodeEntities, inferCategory, normalize, plainText } from "@/lib/news"
 
 describe("decodeEntities", () => {
   it("decodes named, decimal and hex entities", () => {
@@ -37,20 +37,6 @@ describe("normalize", () => {
   it("lowercases and strips diacritics", () => {
     expect(normalize("Eleição")).toBe("eleicao")
     expect(normalize("SÃO PAULO")).toBe("sao paulo")
-  })
-})
-
-describe("stableId", () => {
-  it("is deterministic for the same input", () => {
-    expect(stableId("https://example.com/a")).toBe(stableId("https://example.com/a"))
-  })
-
-  it("differs for different input", () => {
-    expect(stableId("a")).not.toBe(stableId("b"))
-  })
-
-  it("only produces base36 characters", () => {
-    expect(stableId("qualquer texto com acentuação")).toMatch(/^[0-9a-z]+$/)
   })
 })
 
