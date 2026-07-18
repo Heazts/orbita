@@ -1,4 +1,4 @@
-// Content-Security-Policy is set in middleware.ts instead of here: it needs a
+// Content-Security-Policy is set in proxy.ts instead of here: it needs a
 // fresh nonce per request for script-src, which headers() can't generate.
 
 /** @type {import('next').NextConfig} */

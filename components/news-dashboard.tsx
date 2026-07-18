@@ -3,29 +3,16 @@
 import useSWR from "swr"
 import { ArrowUp, Bookmark, Check, Clock3, ExternalLink, Heart, Moon, RefreshCw, Search, Share2, SlidersHorizontal, Sun, X } from "lucide-react"
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
+import { useFavorites } from "@/hooks/use-favorites"
+import { useNow } from "@/hooks/use-now"
+import { useSearchHistory } from "@/hooks/use-search-history"
+import { useTheme } from "@/hooks/use-theme"
 import { FALLBACK_NEWS, NEWS_CATEGORIES, type NewsCategory, type NewsItem, type NewsResponse } from "@/lib/news"
 
 const fetcher = async (url: string): Promise<NewsResponse> => {
   const response = await fetch(url)
   if (!response.ok) throw new Error("Não foi possível pesquisar agora.")
   return response.json()
-}
-
-function readStore<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? (JSON.parse(raw) as T) : fallback
-  } catch {
-    return fallback
-  }
-}
-
-function writeStore(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, typeof value === "string" ? value : JSON.stringify(value))
-  } catch {
-    // Private mode or quota exceeded — persistence is best-effort.
-  }
 }
 
 const timeFormatter = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })
@@ -45,12 +32,17 @@ function relativeTime(value: string, now: number | null) {
 }
 
 function Highlight({ text, query }: { text: string; query: string }) {
-  const terms = query.trim().split(/\s+/).filter((term) => term.length > 1)
-  if (!terms.length) return text
-  const escaped = terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-  const regex = new RegExp(`(${escaped.join("|")})`, "gi")
-  const matches = new RegExp(`^(${escaped.join("|")})$`, "i")
-  return text.split(regex).map((part, index) => matches.test(part) ? <mark key={`${part}-${index}`} className="rounded-sm bg-accent px-0.5 text-accent-foreground">{part}</mark> : <Fragment key={`${part}-${index}`}>{part}</Fragment>)
+  // Memoized per query (not per render): NewsDashboard re-renders every card
+  // on each 60s clock tick, which would otherwise recompile these regexes
+  // for every title/description on the page even though query never changed.
+  const compiled = useMemo(() => {
+    const terms = query.trim().split(/\s+/).filter((term) => term.length > 1)
+    if (!terms.length) return null
+    const escaped = terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    return { regex: new RegExp(`(${escaped.join("|")})`, "gi"), matches: new RegExp(`^(${escaped.join("|")})$`, "i") }
+  }, [query])
+  if (!compiled) return text
+  return text.split(compiled.regex).map((part, index) => compiled.matches.test(part) ? <mark key={`${part}-${index}`} className="rounded-sm bg-accent px-0.5 text-accent-foreground">{part}</mark> : <Fragment key={`${part}-${index}`}>{part}</Fragment>)
 }
 
 function IconButton({ label, onClick, active, children }: { label: string; onClick: () => void; active?: boolean; children: React.ReactNode }) {
@@ -124,7 +116,10 @@ function NewsCard({ item, now, query, favorite, onFavorite, onShare, lead = fals
 
 export function NewsDashboard() {
   const searchRef = useRef<HTMLInputElement>(null)
-  const [now, setNow] = useState<number | null>(null)
+  const now = useNow()
+  const { favorites, favoritesCount, toggleFavorite } = useFavorites()
+  const { history, addTerm } = useSearchHistory()
+  const { theme, toggleTheme } = useTheme()
   const [input, setInput] = useState("")
   const [query, setQuery] = useState("")
   const [category, setCategory] = useState<NewsCategory>("Todas")
@@ -133,9 +128,6 @@ export function NewsDashboard() {
   const [source, setSource] = useState("Todas")
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
-  const [favorites, setFavorites] = useState<Record<string, NewsItem>>({})
-  const [history, setHistory] = useState<string[]>([])
-  const [theme, setTheme] = useState<"light" | "dark">("light")
   const [notice, setNotice] = useState("")
   const [showTop, setShowTop] = useState(false)
   const fallbackItems = useMemo(
@@ -159,18 +151,11 @@ export function NewsDashboard() {
   })
 
   useEffect(() => {
-    // Hydrate client-only persisted state after mount.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFavorites(readStore<Record<string, NewsItem>>("orbita-favorites", {}))
-    setHistory(readStore<string[]>("orbita-history", []))
-    setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light")
     // Seed the search from a shareable ?q= deep link (also the target of the
     // WebSite SearchAction in the JSON-LD).
     const initialQuery = new URLSearchParams(window.location.search).get("q")?.trim()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (initialQuery) setInput(initialQuery)
-    setNow(Date.now())
-    const interval = window.setInterval(() => setNow(Date.now()), 60_000)
-    return () => window.clearInterval(interval)
   }, [])
 
   useEffect(() => {
@@ -195,42 +180,20 @@ export function NewsDashboard() {
     const timeout = window.setTimeout(() => {
       const next = input.trim()
       setQuery(next)
-      if (next.length > 1) {
-        setHistory((current) => {
-          const updated = [next, ...current.filter((term) => term.toLocaleLowerCase("pt-BR") !== next.toLocaleLowerCase("pt-BR"))].slice(0, 6)
-          writeStore("orbita-history", updated)
-          return updated
-        })
-      }
+      if (next.length > 1) addTerm(next)
     }, 450)
     return () => window.clearTimeout(timeout)
-  }, [input])
+  }, [input, addTerm])
 
   const sources = useMemo(() => ["Todas", ...Array.from(new Set((data?.items ?? []).map((item) => item.source))).sort()], [data?.items])
+  const tickerItems = useMemo(() => (data?.items ?? []).slice(0, 8), [data?.items])
   const items = favoritesOnly ? Object.values(favorites).sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt)) : data?.items ?? []
-  const favoritesCount = Object.keys(favorites).length
-  const toggleFavorite = (item: NewsItem) => {
-    setFavorites((current) => {
-      const next = { ...current }
-      if (next[item.id]) delete next[item.id]
-      else next[item.id] = item
-      writeStore("orbita-favorites", next)
-      return next
-    })
-  }
   const share = async (item: NewsItem) => {
     try {
       if (navigator.share) await navigator.share({ title: item.title, url: item.url })
       else { await navigator.clipboard.writeText(item.url); setNotice("Link copiado") }
     } catch { setNotice("Não foi possível compartilhar") }
     window.setTimeout(() => setNotice(""), 2500)
-  }
-  const toggleTheme = () => {
-    const next = theme === "dark" ? "light" : "dark"
-    document.documentElement.classList.remove("light", "dark")
-    document.documentElement.classList.add(next)
-    writeStore("orbita-theme", next)
-    setTheme(next)
   }
   const clear = () => { setInput(""); setQuery(""); setCategory("Todas"); setPeriod("all"); setSort("latest"); setSource("Todas"); setFavoritesOnly(false) }
 
@@ -246,7 +209,7 @@ export function NewsDashboard() {
       </div>
       <div className="mx-auto max-w-7xl px-5 pb-4 md:px-8">
         <div className="flex gap-2">
-          <label className="flex min-w-0 flex-1 items-center gap-3 rounded-full border bg-muted px-4 py-3 focus-within:ring-2 focus-within:ring-ring"><Search className="size-5 text-muted-foreground" /><span className="sr-only">Pesquisar notícias em toda a internet</span><input ref={searchRef} value={input} onChange={(event) => setInput(event.target.value)} type="search" className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder="Pesquise qualquer assunto, lugar ou pessoa... (atalho: /)" />{input && <button type="button" onClick={() => setInput("")} aria-label="Limpar pesquisa"><X className="size-4" /></button>}</label>
+          <label className="flex min-w-0 flex-1 items-center gap-3 rounded-full border bg-muted px-4 py-3 focus-within:ring-2 focus-within:ring-ring"><Search className="size-5 text-muted-foreground" /><span className="sr-only">Pesquisar notícias em toda a internet</span><input ref={searchRef} value={input} onChange={(event) => setInput(event.target.value)} type="search" maxLength={120} className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder="Pesquise qualquer assunto, lugar ou pessoa... (atalho: /)" />{input && <button type="button" onClick={() => setInput("")} aria-label="Limpar pesquisa"><X className="size-4" /></button>}</label>
           <IconButton label="Abrir filtros" active={filtersOpen} onClick={() => setFiltersOpen((open) => !open)}><SlidersHorizontal className="size-4" /></IconButton>
           <div className="relative">
             <IconButton label="Ver favoritos" active={favoritesOnly} onClick={() => setFavoritesOnly((value) => !value)}><Bookmark className="size-4" /></IconButton>
@@ -262,7 +225,12 @@ export function NewsDashboard() {
       </div>
     </header>
 
-    <div className="ticker border-b bg-primary text-primary-foreground" aria-label="Últimas manchetes"><div className="ticker-track flex w-max items-center gap-10 py-2 text-xs font-bold uppercase tracking-wider">{[...(data?.items ?? []).slice(0, 8), ...(data?.items ?? []).slice(0, 8)].map((item, index) => <a key={`${item.id}-${index}`} href={item.url} target="_blank" rel="noopener noreferrer" className="hover:underline"><span className="mr-3 text-destructive">●</span>{item.title}</a>)}</div></div>
+    <div className="ticker border-b bg-primary text-primary-foreground" aria-label="Últimas manchetes"><div className="ticker-track flex w-max items-center gap-10 py-2 text-xs font-bold uppercase tracking-wider">{[...tickerItems, ...tickerItems].map((item, index) => {
+      // The second half only exists so the CSS animation loops seamlessly —
+      // hide it from screen readers and keyboard nav so links aren't visited twice.
+      const isDuplicate = index >= tickerItems.length
+      return <a key={`${item.id}-${index}`} href={item.url} target="_blank" rel="noopener noreferrer" aria-hidden={isDuplicate ? true : undefined} tabIndex={isDuplicate ? -1 : undefined} className="hover:underline"><span className="mr-3 text-destructive" aria-hidden="true">●</span>{item.title}</a>
+    })}</div></div>
 
     <nav aria-label="Categorias" className="border-b"><div className="mx-auto flex max-w-7xl overflow-x-auto px-5 md:px-8">{NEWS_CATEGORIES.map((item) => <button key={item} type="button" onClick={() => { setCategory(item); setFavoritesOnly(false) }} aria-pressed={category === item} className="shrink-0 border-b-2 border-transparent px-4 py-4 text-xs font-bold uppercase tracking-widest text-muted-foreground aria-pressed:border-primary aria-pressed:text-foreground">{item}</button>)}</div></nav>
 

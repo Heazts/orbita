@@ -32,14 +32,24 @@ app/
   layout.tsx           # metadados, fontes e tema
   page.tsx              # ponto de entrada da página
 components/
-  news-dashboard.tsx   # toda a interface e o estado do painel
+  news-dashboard.tsx   # interface do painel (estado de UI e busca/filtros)
+hooks/
+  use-favorites.ts      # favoritos persistidos em localStorage
+  use-search-history.ts # histórico de busca persistido em localStorage
+  use-theme.ts           # tema claro/escuro
+  use-now.ts             # relógio para timestamps relativos ("há 5 min")
 lib/
   news.ts               # tipos, fontes de feed, categorias e utilitários de texto
   parse.ts              # parsing de RSS/Atom e cálculo de relevância (testável)
+  rate-limit.ts          # rate limiter em memória por IP
+  storage.ts             # helpers de leitura/escrita em localStorage
   site.ts               # constantes do site (URL, título, descrição)
+proxy.ts                 # CSP com nonce por request (convenção "proxy" do Next 16)
 tests/
   news.test.ts          # testes de lib/news.ts
   parse.test.ts         # testes de lib/parse.ts (com fixtures de feed)
+  rate-limit.test.ts    # testes de lib/rate-limit.ts
+  hooks/                 # testes dos hooks (ambiente jsdom + Testing Library)
 ```
 
 ## Responsividade
@@ -61,7 +71,7 @@ A interface é mobile-first com Tailwind (`sm:`/`md:`/`lg:`), testada em 320px, 
 
 ## Segurança
 
-- **Cabeçalhos HTTP**: `next.config.mjs` define `Content-Security-Policy`, `Strict-Transport-Security` (HSTS), `Cross-Origin-Opener-Policy`, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy` e `Permissions-Policy` para todas as rotas. `X-Powered-By` é desativado para não expor o framework.
+- **Cabeçalhos HTTP**: `proxy.ts` define a `Content-Security-Policy` com nonce por request; `next.config.mjs` define `Strict-Transport-Security` (HSTS), `Cross-Origin-Opener-Policy`, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy` e `Permissions-Policy` para todas as rotas. `X-Powered-By` é desativado para não expor o framework.
 - **Automação (GitHub)**: em `.github/workflows/` — CI (lint + testes + build), **CodeQL** (SAST em cada PR e semanal), **Dependency Review** (bloqueia PRs que adicionam dependências com CVE alto), **OSV-Scanner** (audita o `pnpm-lock.yaml` contra a base OSV — usado no lugar do `pnpm audit`, cujo endpoint foi descontinuado, e do lockfile npm regenerado, que ignora os overrides de pnpm) e **OpenSSF Scorecard** (avalia a postura de segurança do repositório). O **Dependabot** (`.github/dependabot.yml`) abre PRs de atualização e o workflow `dependabot-auto-merge` faz merge automático de patch/minor quando o CI passa.
 - **Ajustes a habilitar no GitHub** (Settings → Code security, grátis em repositório público): *Secret Scanning* + *Push Protection*, *Dependabot alerts* e *Dependabot security updates*. Para o auto-merge funcionar, ligue *Allow auto-merge* e uma regra de proteção do branch `main` exigindo os checks de CI.
 - **Rate limiting**: a rota `/api/news` limita a ~30 requisições/minuto por IP (best-effort, em memória por instância). Isso resolve o abuso casual; em produção com múltiplas instâncias, prefira um rate limit de borda (Vercel Firewall/KV, Upstash) para uma garantia mais forte.
@@ -72,7 +82,7 @@ A interface é mobile-first com Tailwind (`sm:`/`md:`/`lg:`), testada em 320px, 
 
 ## Testes
 
-Testes unitários com [Vitest](https://vitest.dev/) cobrem os utilitários de texto (`lib/news.ts`: `decodeEntities`, `plainText`, `normalize`, `stableId`, `inferCategory`) e o parsing de feeds (`lib/parse.ts`: `parseFeed`, `findImage`, `findLink`, `relevance`) com fixtures de RSS/Atom e do Google News. Rode com `pnpm test` (watch) ou `pnpm test:run` (uma vez, como no CI).
+Testes unitários com [Vitest](https://vitest.dev/) cobrem os utilitários de texto (`lib/news.ts`: `decodeEntities`, `plainText`, `normalize`, `inferCategory`), o parsing de feeds (`lib/parse.ts`: `parseFeed`, `findImage`, `findLink`, `relevance`) com fixtures de RSS/Atom e do Google News, e o rate limiter (`lib/rate-limit.ts`). Rode com `pnpm test` (watch) ou `pnpm test:run` (uma vez, como no CI).
 
 ## Notas
 

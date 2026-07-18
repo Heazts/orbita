@@ -20,7 +20,12 @@ export function clientIp(request: Pick<NextRequest, "headers">): string {
     const ips = forwarded.split(",").map((ip) => ip.trim()).filter(Boolean)
     if (ips.length) return ips[ips.length - 1]
   }
-  return "unknown"
+  // No IP-identifying header at all — shouldn't happen behind Vercel's proxy,
+  // which always sets x-forwarded-for, but could on another host without one.
+  // A fresh key per call (not a fixed "unknown" string) keeps unrelated
+  // clients from sharing a bucket and locking each other out; it also means
+  // such requests aren't rate-limited, same as if this feature didn't exist.
+  return `unknown-${crypto.randomUUID()}`
 }
 
 export function isRateLimited(clientId: string, now: number = Date.now()): boolean {

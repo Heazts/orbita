@@ -20,8 +20,14 @@ describe("clientIp", () => {
     expect(clientIp(headers({ "x-real-ip": "203.0.113.9", "x-forwarded-for": "1.1.1.1" }))).toBe("203.0.113.9")
   })
 
-  it("falls back to 'unknown' with no headers", () => {
-    expect(clientIp(headers({}))).toBe("unknown")
+  it("returns a fresh unique key per call with no headers, instead of a fixed value", () => {
+    // A fixed fallback would let unrelated clients share one rate-limit
+    // bucket and lock each other out; a unique key per call avoids that.
+    const first = clientIp(headers({}))
+    const second = clientIp(headers({}))
+    expect(first).toMatch(/^unknown-/)
+    expect(second).toMatch(/^unknown-/)
+    expect(first).not.toBe(second)
   })
 })
 
