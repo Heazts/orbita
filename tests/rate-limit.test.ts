@@ -74,10 +74,10 @@ describe("checkRateLimit", () => {
 
   it("reports zero remaining and a positive retry delay once limited", () => {
     const now = 5_000_000
-    let result = checkRateLimit("a", now)
-    for (let i = 1; i < RATE_LIMIT_MAX_REQUESTS; i += 1) result = checkRateLimit("a", now)
+    // Exhaust the budget — each call counts as one request.
+    for (let i = 0; i < RATE_LIMIT_MAX_REQUESTS; i += 1) checkRateLimit("a", now)
     // The request past the limit is blocked.
-    result = checkRateLimit("a", now)
+    const result = checkRateLimit("a", now)
     expect(result.limited).toBe(true)
     expect(result.remaining).toBe(0)
     expect(result.retryAfterSeconds).toBeGreaterThan(0)
