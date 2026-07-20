@@ -22,13 +22,13 @@ type CspBody = {
   blockedURL?: string
 }
 
-// Report fields are attacker-controlled, so strip control characters (CR/LF and
-// friends, which could forge log lines) and cap the length. Used both per field
-// and once more at the log sink, so CodeQL sees the barrier right before the
-// console call and the two callers stay consistent.
+// Report fields are attacker-controlled, so strip control characters and cap the
+// length. \r and \n are listed explicitly (in addition to the \x00-\x1f range
+// that already covers them) so static analysers recognise the newline-stripping
+// as a log-forging barrier. Used per field and again at the log sink.
 function stripForLog(value: unknown, maxLength: number): string {
   if (typeof value !== "string") return "unknown"
-  return value.replace(/[\x00-\x1f\x7f]+/g, " ").trim().slice(0, maxLength) || "unknown"
+  return value.replace(/[\r\n\x00-\x1f\x7f]+/g, " ").trim().slice(0, maxLength) || "unknown"
 }
 
 function summarise(body: CspBody): string {
