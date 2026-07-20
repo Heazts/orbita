@@ -28,7 +28,16 @@ export function clientIp(request: Pick<NextRequest, "headers">): string {
   return `unknown-${crypto.randomUUID()}`
 }
 
-export function isRateLimited(clientId: string, now: number = Date.now()): boolean {
+export type RateLimitResult = {
+  limited: boolean
+  // Requests still allowed in the current window (0 when limited).
+  remaining: number
+  // Seconds until the oldest counted request leaves the window — what to put in
+  // a Retry-After header when limited.
+  retryAfterSeconds: number
+}
+
+export function checkRateLimit(clientId: string, now: number = Date.now()): RateLimitResult {
   // Occasionally sweep buckets whose timestamps are all stale so the map
   // doesn't grow unbounded across many distinct IPs.
   if (Math.random() < 0.02) {
@@ -39,7 +48,15 @@ export function isRateLimited(clientId: string, now: number = Date.now()): boole
   const recent = (requestLog.get(clientId) ?? []).filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS)
   recent.push(now)
   requestLog.set(clientId, recent)
-  return recent.length > RATE_LIMIT_MAX_REQUESTS
+  const limited = recent.length > RATE_LIMIT_MAX_REQUESTS
+  const remaining = Math.max(0, RATE_LIMIT_MAX_REQUESTS - recent.length)
+  // When limited, wait until the oldest request in the window expires.
+  const retryAfterSeconds = limited ? Math.max(1, Math.ceil((RATE_LIMIT_WINDOW_MS - (now - recent[0])) / 1000)) : 0
+  return { limited, remaining, retryAfterSeconds }
+}
+
+export function isRateLimited(clientId: string, now: number = Date.now()): boolean {
+  return checkRateLimit(clientId, now).limited
 }
 
 // Exposed for tests so state doesn't leak between cases.

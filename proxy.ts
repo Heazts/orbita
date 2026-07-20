@@ -13,9 +13,20 @@ function buildCsp(nonce: string): string {
     "img-src 'self' https: data:",
     "font-src 'self' data:",
     `connect-src 'self'${isDev ? " ws:" : ""}`,
+    // The service worker (public/sw.js) and the PWA manifest are same-origin.
+    "worker-src 'self'",
+    "manifest-src 'self'",
+    // Explicitly forbid plugins and any framing/child browsing contexts. These
+    // fall back to default-src 'self' already, but scanners flag their absence
+    // and 'none' is stricter than the 'self' fallback.
+    "object-src 'none'",
+    "frame-src 'none'",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
+    // Defence in depth: force any accidental http subresource to https. Skipped
+    // in dev so a plain-http localhost/LAN dev server keeps working.
+    ...(isDev ? [] : ["upgrade-insecure-requests"]),
   ].join("; ")
 }
 
