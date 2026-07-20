@@ -10,7 +10,7 @@ import {
   type NewsResponse,
 } from "@/lib/news"
 import { parseFeed, relevance } from "@/lib/parse"
-import { RATE_LIMIT_MAX_REQUESTS, checkRateLimit, clientIp } from "@/lib/rate-limit"
+import { RATE_LIMIT_MAX_REQUESTS, checkRateLimitDistributed, clientIp } from "@/lib/rate-limit"
 
 export const revalidate = 300
 
@@ -68,7 +68,9 @@ async function searchGoogle(query: string): Promise<NewsItem[]> {
 
 export async function GET(request: NextRequest) {
   const clientId = clientIp(request)
-  const rate = checkRateLimit(clientId)
+  // Uses Upstash Redis for a cross-instance limit when configured, otherwise
+  // falls back to the per-instance in-memory counter.
+  const rate = await checkRateLimitDistributed(clientId)
   const rateHeaders: Record<string, string> = {
     "X-RateLimit-Limit": String(RATE_LIMIT_MAX_REQUESTS),
     "X-RateLimit-Remaining": String(rate.remaining),
