@@ -22,10 +22,17 @@ type CspBody = {
   blockedURL?: string
 }
 
+// Report fields are attacker-controlled, so strip control characters (CR/LF and
+// friends, which could forge log lines) and cap the length before logging.
+function sanitiseField(value: unknown): string {
+  if (typeof value !== "string") return "unknown"
+  return value.replace(/[\x00-\x1f\x7f]+/g, " ").trim().slice(0, 256) || "unknown"
+}
+
 function summarise(body: CspBody): string {
-  const directive = body["violated-directive"] ?? body.effectiveDirective ?? "unknown-directive"
-  const blocked = body["blocked-uri"] ?? body.blockedURL ?? "unknown"
-  const document = body["document-uri"] ?? body.documentURL ?? "unknown"
+  const directive = sanitiseField(body["violated-directive"] ?? body.effectiveDirective)
+  const blocked = sanitiseField(body["blocked-uri"] ?? body.blockedURL)
+  const document = sanitiseField(body["document-uri"] ?? body.documentURL)
   return `directive=${directive} blocked=${blocked} document=${document}`
 }
 
