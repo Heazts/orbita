@@ -29,6 +29,11 @@ function sanitiseField(value: unknown): string {
   return value.replace(/[\x00-\x1f\x7f]+/g, " ").trim().slice(0, 256) || "unknown"
 }
 
+// Defence in depth: sanitise the final log message at the sink boundary.
+function sanitiseLogMessage(value: string): string {
+  return value.replace(/[\x00-\x1f\x7f]+/g, " ").trim().slice(0, 1024)
+}
+
 function summarise(body: CspBody): string {
   const directive = sanitiseField(body["violated-directive"] ?? body.effectiveDirective)
   const blocked = sanitiseField(body["blocked-uri"] ?? body.blockedURL)
@@ -59,7 +64,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     : [(payload as { "csp-report"?: CspBody })["csp-report"]].filter(Boolean)
 
   for (const body of reports) {
-    if (body) console.warn(`[csp-violation] ${summarise(body)}`)
+    if (body) console.warn(`[csp-violation] ${sanitiseLogMessage(summarise(body))}`)
   }
 
   // 204: the reporting API ignores the body; a small empty response is enough.
