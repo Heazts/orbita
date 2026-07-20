@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest"
-import { RATE_LIMIT_MAX_REQUESTS, clientIp, isRateLimited, resetRateLimit } from "@/lib/rate-limit"
+import {
+  RATE_LIMIT_MAX_REQUESTS,
+  checkRateLimit,
+  clientIp,
+  isRateLimited,
+  resetRateLimit,
+} from "@/lib/rate-limit"
 
 function headers(map: Record<string, string>) {
   return { headers: new Headers(map) }
@@ -54,5 +60,27 @@ describe("isRateLimited", () => {
     expect(isRateLimited("a", start)).toBe(true)
     // Well past the 60s window: the old timestamps are dropped.
     expect(isRateLimited("a", start + 61_000)).toBe(false)
+  })
+})
+
+describe("checkRateLimit", () => {
+  it("reports remaining budget and no retry delay while under the limit", () => {
+    const now = 4_000_000
+    const first = checkRateLimit("a", now)
+    expect(first.limited).toBe(false)
+    expect(first.remaining).toBe(RATE_LIMIT_MAX_REQUESTS - 1)
+    expect(first.retryAfterSeconds).toBe(0)
+  })
+
+  it("reports zero remaining and a positive retry delay once limited", () => {
+    const now = 5_000_000
+    // Exhaust the budget — each call counts as one request.
+    for (let i = 0; i < RATE_LIMIT_MAX_REQUESTS; i += 1) checkRateLimit("a", now)
+    // The request past the limit is blocked.
+    const result = checkRateLimit("a", now)
+    expect(result.limited).toBe(true)
+    expect(result.remaining).toBe(0)
+    expect(result.retryAfterSeconds).toBeGreaterThan(0)
+    expect(result.retryAfterSeconds).toBeLessThanOrEqual(60)
   })
 })

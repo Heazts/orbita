@@ -10,7 +10,7 @@ import {
   type NewsResponse,
 } from "@/lib/news"
 import { parseFeed, relevance } from "@/lib/parse"
-import { clientIp, isRateLimited } from "@/lib/rate-limit"
+import { RATE_LIMIT_MAX_REQUESTS, checkRateLimit, clientIp } from "@/lib/rate-limit"
 
 export const revalidate = 300
 
@@ -68,10 +68,15 @@ async function searchGoogle(query: string): Promise<NewsItem[]> {
 
 export async function GET(request: NextRequest) {
   const clientId = clientIp(request)
-  if (isRateLimited(clientId)) {
+  const rate = checkRateLimit(clientId)
+  const rateHeaders: Record<string, string> = {
+    "X-RateLimit-Limit": String(RATE_LIMIT_MAX_REQUESTS),
+    "X-RateLimit-Remaining": String(rate.remaining),
+  }
+  if (rate.limited) {
     return NextResponse.json(
       { error: "Muitas requisições. Tente novamente em instantes." },
-      { status: 429, headers: { "Retry-After": "60" } },
+      { status: 429, headers: { ...rateHeaders, "Retry-After": String(rate.retryAfterSeconds) } },
     )
   }
   const params = request.nextUrl.searchParams
@@ -122,5 +127,7 @@ export async function GET(request: NextRequest) {
     isFallback: !query && unique.length === 0,
     ...(failedSources.length ? { failedSources } : {}),
   }
-  return NextResponse.json(payload, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } })
+  return NextResponse.json(payload, {
+    headers: { ...rateHeaders, "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
+  })
 }
