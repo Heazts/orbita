@@ -19,8 +19,13 @@ possível para responder rapidamente.
 
 - Cabeçalhos HTTP de segurança (CSP, `X-Frame-Options`, `X-Content-Type-Options`,
   `Referrer-Policy`, `Permissions-Policy`) aplicados a todas as rotas.
+- CSP baseada em nonce, com relato de violações (`report-to` +
+  `Reporting-Endpoints`) recebido em `/api/csp-report`.
 - A API `/api/news` só busca em uma lista fixa de feeds e no Google News; a
   entrada do usuário nunca vira um host/URL arbitrário (sem SSRF).
 - Conteúdo de feeds é renderizado como texto pelo React (sem `dangerouslySetInnerHTML`).
-- Rate limiting best-effort na API.
+- Rate limiting na API: por instância (em memória) por padrão, ou distribuído
+  entre instâncias via Upstash Redis quando `UPSTASH_REDIS_REST_URL` e
+  `UPSTASH_REDIS_REST_TOKEN` estão configurados (veja `.env.example`).
+- `/.well-known/security.txt` (RFC 9116) aponta para este processo de divulgação.
 - Dependências monitoradas por Dependabot e código analisado por CodeQL.

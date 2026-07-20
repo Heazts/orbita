@@ -1,8 +1,10 @@
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   RATE_LIMIT_MAX_REQUESTS,
   checkRateLimit,
+  checkRateLimitDistributed,
   clientIp,
+  isDistributedRateLimitEnabled,
   isRateLimited,
   resetRateLimit,
 } from "@/lib/rate-limit"
@@ -82,5 +84,64 @@ describe("checkRateLimit", () => {
     expect(result.remaining).toBe(0)
     expect(result.retryAfterSeconds).toBeGreaterThan(0)
     expect(result.retryAfterSeconds).toBeLessThanOrEqual(60)
+  })
+})
+
+describe("checkRateLimitDistributed", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+
+  it("is disabled without Upstash env vars", () => {
+    expect(isDistributedRateLimitEnabled()).toBe(false)
+  })
+
+  it("falls back to the in-memory limiter when Upstash is not configured", async () => {
+    const now = 6_000_000
+    for (let i = 0; i < RATE_LIMIT_MAX_REQUESTS; i += 1) await checkRateLimitDistributed("mem", now)
+    const result = await checkRateLimitDistributed("mem", now)
+    expect(result.limited).toBe(true)
+  })
+
+  it("counts in Redis and derives limited/remaining from the returned count", async () => {
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://example.upstash.io")
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "token")
+    expect(isDistributedRateLimitEnabled()).toBe(true)
+
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify([{ result: RATE_LIMIT_MAX_REQUESTS + 1 }, { result: 1 }]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    )
+    vi.stubGlobal("fetch", fetchMock)
+
+    const result = await checkRateLimitDistributed("1.2.3.4", 7_000_000)
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(result.limited).toBe(true)
+    expect(result.remaining).toBe(0)
+    expect(result.retryAfterSeconds).toBeGreaterThan(0)
+  })
+
+  it("fails open to the in-memory limiter when the Redis call errors", async () => {
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://example.upstash.io")
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "token")
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 500 })))
+
+    // A single request must not be reported as limited just because Redis is down.
+    const result = await checkRateLimitDistributed("5.6.7.8", 8_000_000)
+    expect(result.limited).toBe(false)
+  })
+
+  it("skips Redis for clients with no identifying IP", async () => {
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://example.upstash.io")
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "token")
+    const fetchMock = vi.fn(async () => new Response("[]", { status: 200 }))
+    vi.stubGlobal("fetch", fetchMock)
+
+    const result = await checkRateLimitDistributed("unknown-abc", 9_000_000)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(result.limited).toBe(false)
   })
 })
