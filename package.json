@@ -40,9 +40,7 @@
     "typescript": "5.9.3",
     "vitest": "^4.1.10"
   },
-  "pnpm": {
-    "overrides": {
-      "postcss": "^8.5.10"
-    }
+  "overrides": {
+    "postcss": "^8.5.10"
   }
 }

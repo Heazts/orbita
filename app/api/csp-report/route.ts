@@ -28,7 +28,8 @@ type CspBody = {
 // as a log-forging barrier. Used per field and again at the log sink.
 function stripForLog(value: unknown, maxLength: number): string {
   if (typeof value !== "string") return "unknown"
-  return value.replace(/[\r\n\x00-\x1f\x7f]+/g, " ").trim().slice(0, maxLength) || "unknown"
+  const sanitized = value.replace(/[\r\n\x00-\x1f\x7f\x80-\x9f]+/g, " ").trim()
+  return sanitized.length > maxLength ? sanitized.slice(0, maxLength) : sanitized || "unknown"
 }
 
 function summarise(body: CspBody): string {
