@@ -70,14 +70,14 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 export function findLink(item: Record<string, unknown>): string {
-  if (typeof item.link === "string") return item.link
+  if (typeof item.link === "string") return item.link.trim()
   for (const candidate of asArray(item.link)) {
     if (isObject(candidate)) {
       const href = candidate["@_href"]
-      if (typeof href === "string") return href
+      if (typeof href === "string") return href.trim()
     }
   }
-  return textValue(item.guid ?? item.id)
+  return textValue(item.guid ?? item.id).trim()
 }
 
 type RssFeed = {
