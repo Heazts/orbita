@@ -1,4 +1,5 @@
 [[IgnoredVulns]]
 id = "GHSA-f88m-g3jw-g9cj"
-ignoreUntil = 2030-01-01
+ignoreUntil = "2030-01-01"
 reason = "Sharp is an optional unused sub-dependency in Next.js build setup (images: { unoptimized: true })"
+
