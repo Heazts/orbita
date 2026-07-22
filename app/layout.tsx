@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono, Lora } from "next/font/google"
 import { headers } from "next/headers"
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "@/lib/site"
+import { ErrorBoundary } from "@/components/error-boundary"
 import { ServiceWorkerRegister } from "./sw-register"
 import "./globals.css"
 
@@ -88,7 +89,7 @@ export const viewport: Viewport = {
 }
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  // Set by proxy.ts, which also puts the matching nonce in the CSP
+  // Set by middleware.ts, which also puts the matching nonce in the CSP
   // header — required for these inline scripts to run without 'unsafe-inline'.
   const nonce = (await headers()).get("x-nonce") ?? undefined
   return (
@@ -98,7 +99,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <script nonce={nonce} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       </head>
       <body className="font-sans antialiased">
-        {children}
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
         <ServiceWorkerRegister />
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
