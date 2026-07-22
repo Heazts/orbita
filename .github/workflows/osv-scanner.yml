@@ -8,18 +8,8 @@ on:
   schedule:
     - cron: "18 4 * * 1"
 
-permissions: read-all
-
 jobs:
   scan:
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: google/osv-scanner-action@v2.0.2
-        with:
-          config-path: .osv-scanner.toml
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@e69cc6c86b31f1e7e23935bbe7031b50e51082de
+    with:
+      config-path: .osv-scanner.toml
