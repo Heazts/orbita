@@ -23,3 +23,5 @@ jobs:
       contents: read
       security-events: write
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@e69cc6c86b31f1e7e23935bbe7031b50e51082de # v2.0.2
+    with:
+      config-path: .osv-scanner.toml
