@@ -1,11 +1,5 @@
 name: OSV-Scanner
 
-# Scans pnpm-lock.yaml against the OSV vulnerability database. Used instead of
-# `pnpm audit`, whose npm audit endpoint has been retired, and instead of a
-# regenerated npm lockfile, which ignores pnpm overrides (e.g. the postcss
-# override here) and reports false positives. OSV reads pnpm-lock.yaml directly,
-# so it audits the exact versions pnpm installs. Results appear in the Security
-# tab as code scanning alerts.
 on:
   pull_request:
     branches: [main]
@@ -14,9 +8,18 @@ on:
   schedule:
     - cron: "18 4 * * 1"
 
+permissions: read-all
+
 jobs:
   scan:
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@e69cc6c86b31f1e7e23935bbe7031b50e51082de # v2.0.2
-    with:
-      config-path: .osv-scanner.toml
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
 
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google/osv-scanner-action@v2.0.2
+        with:
+          config-path: .osv-scanner.toml
