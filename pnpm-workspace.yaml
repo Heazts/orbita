@@ -1,0 +1,3 @@
+overrides:
+  postcss: "^8.5.22"
+  sharp: "^0.34.5"
