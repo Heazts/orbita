@@ -6,27 +6,26 @@ on:
   pull_request:
     branches: [main]
 
-permissions: {}
+permissions: read-all
 
 jobs:
-  verify:
+  ci:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: 20
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm run lint
+      - run: pnpm lint
 
-      - run: pnpm run test:run
+      - run: pnpm test:run
 
-      - run: pnpm run build
+      - run: pnpm build

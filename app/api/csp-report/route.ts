@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-// Receives Content-Security-Policy violation reports (configured in proxy.ts).
+// Receives Content-Security-Policy violation reports (configured in middleware.ts).
 // Browsers send two shapes depending on the directive that triggered them:
 //   - report-uri  → { "csp-report": {...} } with Content-Type application/csp-report
 //   - report-to   → [ { type: "csp-violation", body: {...} }, ... ] with
@@ -62,7 +62,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     : [(payload as { "csp-report"?: CspBody })["csp-report"]].filter(Boolean)
 
   for (const body of reports) {
-    if (body) console.warn(`[csp-violation] ${stripForLog(summarise(body), 1024)}`)
+    if (!body) continue
+    const summary = stripForLog(summarise(body), 1024)
+    // stripForLog above already removes control characters including \n and \r,
+    // but we strip again here so static analysers recognise the barrier.
+    if (summary.includes("\n") || summary.includes("\r")) continue
+    console.warn(`[csp-violation] ${summary}`)
   }
 
   // 204: the reporting API ignores the body; a small empty response is enough.
