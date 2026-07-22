@@ -93,7 +93,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // header — required for these inline scripts to run without 'unsafe-inline'.
   const nonce = (await headers()).get("x-nonce") ?? undefined
   return (
-    <html lang="pt-BR" suppressHydrationWarning className={`bg-background ${geist.variable} ${geistMono.variable} ${lora.variable}`}>
+    <html lang="pt-BR" suppressHydrationWarning className={`${geist.variable} ${geistMono.variable} ${lora.variable}`}>
       <head>
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('orbita-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');else document.documentElement.classList.add('light')}catch(e){}})()` }} />
         <script nonce={nonce} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />

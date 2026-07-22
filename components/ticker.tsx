@@ -8,7 +8,6 @@ export function Ticker({ items }: TickerProps) {
   return (
     <div
       className="ticker border-b bg-primary text-primary-foreground"
-      role="marquee"
       aria-label="Últimas manchetes"
       aria-live="polite"
     >

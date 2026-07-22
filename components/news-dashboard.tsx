@@ -105,8 +105,6 @@ export function NewsDashboard() {
     keepPreviousData: true,
   })
 
-
-
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
       if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return

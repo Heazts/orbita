@@ -8,7 +8,9 @@ import { Highlight } from "@/components/highlight"
 
 function relativeTime(value: string, now: number | null) {
   if (now === null) return ""
-  const minutes = Math.max(0, Math.round((now - Date.parse(value)) / 60_000))
+  const parsed = Date.parse(value)
+  if (isNaN(parsed)) return ""
+  const minutes = Math.max(0, Math.round((now - parsed) / 60_000))
   if (minutes < 1) return "agora"
   if (minutes < 60) return `há ${minutes} min`
   if (minutes < 1440) return `há ${Math.floor(minutes / 60)}h`

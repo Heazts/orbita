@@ -82,52 +82,57 @@ export const FEED_SOURCES: FeedSource[] = [
   },
 ]
 
-export const FALLBACK_NEWS: NewsItem[] = [
-  {
-    id: "fallback-1",
-    title: "Acompanhe os acontecimentos que movimentam o mundo",
-    description:
-      "Nossa redação digital reúne notícias de fontes públicas e confiáveis em um só lugar.",
-    url: "https://www.bbc.com/portuguese",
-    image: null,
-    source: "BBC Brasil",
-    category: "Mundo",
-    publishedAt: new Date().toISOString(),
-  },
-  {
-    id: "fallback-2",
-    title: "Mercados globais analisam o novo cenário econômico",
-    description:
-      "Indicadores internacionais e decisões de bancos centrais seguem no radar dos investidores.",
-    url: "https://agenciabrasil.ebc.com.br/economia",
-    image: null,
-    source: "Agência Brasil",
-    category: "Economia",
-    publishedAt: new Date(Date.now() - 30 * 60_000).toISOString(),
-  },
-  {
-    id: "fallback-3",
-    title: "Tecnologia transforma a forma como informação circula",
-    description:
-      "Novas ferramentas ampliam o acesso ao conhecimento e mudam hábitos ao redor do planeta.",
-    url: "https://olhardigital.com.br/",
-    image: null,
-    source: "Olhar Digital",
-    category: "Tecnologia",
-    publishedAt: new Date(Date.now() - 60 * 60_000).toISOString(),
-  },
-  {
-    id: "fallback-4",
-    title: "Ciência abre novas janelas para observar o universo",
-    description:
-      "Missões e observatórios avançam na busca por respostas sobre o espaço profundo.",
-    url: "https://www.nasa.gov/news/",
-    image: null,
-    source: "NASA",
-    category: "Ciência",
-    publishedAt: new Date(Date.now() - 90 * 60_000).toISOString(),
-  },
-]
+function createFallbackNews(): NewsItem[] {
+  const now = Date.now()
+  return [
+    {
+      id: "fallback-1",
+      title: "Acompanhe os acontecimentos que movimentam o mundo",
+      description:
+        "Nossa redação digital reúne notícias de fontes públicas e confiáveis em um só lugar.",
+      url: "https://www.bbc.com/portuguese",
+      image: null,
+      source: "BBC Brasil",
+      category: "Mundo",
+      publishedAt: new Date(now).toISOString(),
+    },
+    {
+      id: "fallback-2",
+      title: "Mercados globais analisam o novo cenário econômico",
+      description:
+        "Indicadores internacionais e decisões de bancos centrais seguem no radar dos investidores.",
+      url: "https://agenciabrasil.ebc.com.br/economia",
+      image: null,
+      source: "Agência Brasil",
+      category: "Economia",
+      publishedAt: new Date(now - 30 * 60_000).toISOString(),
+    },
+    {
+      id: "fallback-3",
+      title: "Tecnologia transforma a forma como informação circula",
+      description:
+        "Novas ferramentas ampliam o acesso ao conhecimento e mudam hábitos ao redor do planeta.",
+      url: "https://olhardigital.com.br/",
+      image: null,
+      source: "Olhar Digital",
+      category: "Tecnologia",
+      publishedAt: new Date(now - 60 * 60_000).toISOString(),
+    },
+    {
+      id: "fallback-4",
+      title: "Ciência abre novas janelas para observar o universo",
+      description:
+        "Missões e observatórios avançam na busca por respostas sobre o espaço profundo.",
+      url: "https://www.nasa.gov/news/",
+      image: null,
+      source: "NASA",
+      category: "Ciência",
+      publishedAt: new Date(now - 90 * 60_000).toISOString(),
+    },
+  ]
+}
+
+export const FALLBACK_NEWS: NewsItem[] = createFallbackNews()
 
 function codePointToString(value: number): string {
   return Number.isFinite(value) && value >= 0 && value <= 0x10ffff ? String.fromCodePoint(value) : ""
@@ -166,13 +171,15 @@ export function inferCategory(
   title: string,
   fallback: FeedSource["category"],
 ): FeedSource["category"] {
-  const normalized = title.toLocaleLowerCase("pt-BR")
-  if (/econom|mercado|inflação|banco|juros|empresa|negócio/.test(normalized)) return "Economia"
-  if (/tecnolog|digital|internet|inteligência artificial|software|celular/.test(normalized)) return "Tecnologia"
-  if (/saúde|vacina|hospital|doença|médic|remédio|sus|vírus|pandemia/.test(normalized)) return "Saúde"
-  if (/futebol|copa|olimpí|campeonato|jogador|técnico|placar|gol|esporte|atleta/.test(normalized)) return "Esportes"
-  if (/ciência|espaço|nasa|pesquisa|clima|estudo|astronomia/.test(normalized)) return "Ciência"
-  if (/cultura|cinema|música|livro|arte|festival/.test(normalized)) return "Cultura"
-  if (/governo|eleição|presidente|congresso|política|ministro/.test(normalized)) return "Política"
+  // Use the same normalize() function as relevance() for consistency:
+  // lowercase + NFD decomposition + strip diacritics.
+  const normalized = normalize(title)
+  if (/econom|mercado|inflacao|banco|juros|empresa|negocio/.test(normalized)) return "Economia"
+  if (/tecnolog|digital|internet|inteligencia artificial|software|celular/.test(normalized)) return "Tecnologia"
+  if (/saude|vacina|hospital|doenca|medic|remedio|sus|virus|pandemia/.test(normalized)) return "Saúde"
+  if (/futebol|copa|olimpi|campeonato|jogador|tecnico|placar|gol|esporte|atleta/.test(normalized)) return "Esportes"
+  if (/ciencia|espaco|nasa|pesquisa|clima|estudo|astronomia/.test(normalized)) return "Ciência"
+  if (/cultura|cinema|musica|livro|arte|festival/.test(normalized)) return "Cultura"
+  if (/governo|eleicao|presidente|congresso|politica|ministro/.test(normalized)) return "Política"
   return fallback
 }
