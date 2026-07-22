@@ -1,3 +1,7 @@
 [[IgnoredVulns]]
 id = "GHSA-f88m-g3jw-g9cj"
 reason = "Sharp is an optional unused sub-dependency in Next.js build setup"
+
+[[IgnoredVulns]]
+id = "GHSA-qx2v-qp2m-jg93"
+reason = "Postcss transitive sub-dependency"
