@@ -67,7 +67,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // stripForLog above already removes control characters including \n and \r,
     // but we strip again here so static analysers recognise the barrier.
     if (summary.includes("\n") || summary.includes("\r")) continue
-    console.warn(`[csp-violation] ${summary}`)
+    console.warn("[csp-violation] %s", summary)
   }
 
   // 204: the reporting API ignores the body; a small empty response is enough.

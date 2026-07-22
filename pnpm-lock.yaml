@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  postcss: '>=8.4.45'
+  postcss: ^8.5.22
 
 importers:
 
@@ -61,7 +61,7 @@ importers:
         specifier: ^29.1.1
         version: 29.1.1
       postcss:
-        specifier: '>=8.4.45'
+        specifier: ^8.5.22
         version: 8.5.22
       tailwindcss:
         specifier: ^4.3.2

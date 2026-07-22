@@ -14,8 +14,6 @@ on:
   schedule:
     - cron: "18 4 * * 1"
 
-permissions: read-all
-
 jobs:
   scan:
     permissions:
