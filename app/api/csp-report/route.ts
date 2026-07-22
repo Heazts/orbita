@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-// Receives Content-Security-Policy violation reports (configured in middleware.ts).
+// Receives Content-Security-Policy violation reports (configured in proxy.ts).
 // Browsers send two shapes depending on the directive that triggered them:
 //   - report-uri  → { "csp-report": {...} } with Content-Type application/csp-report
 //   - report-to   → [ { type: "csp-violation", body: {...} }, ... ] with

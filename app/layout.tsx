@@ -89,7 +89,7 @@ export const viewport: Viewport = {
 }
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  // Set by middleware.ts, which also puts the matching nonce in the CSP
+  // Set by proxy.ts, which also puts the matching nonce in the CSP
   // header — required for these inline scripts to run without 'unsafe-inline'.
   const nonce = (await headers()).get("x-nonce") ?? undefined
   return (
