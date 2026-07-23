@@ -28,7 +28,8 @@ type CspBody = {
 // as a log-forging barrier. Used per field and again at the log sink.
 function stripForLog(value: unknown, maxLength: number): string {
   if (typeof value !== "string") return "unknown"
-  return value.replace(/[\r\n\x00-\x1f\x7f]+/g, " ").trim().slice(0, maxLength) || "unknown"
+  const sanitized = value.replace(/[\r\n\x00-\x1f\x7f\x80-\x9f]+/g, " ").trim()
+  return sanitized.length > maxLength ? sanitized.slice(0, maxLength) : sanitized || "unknown"
 }
 
 function summarise(body: CspBody): string {
@@ -61,7 +62,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     : [(payload as { "csp-report"?: CspBody })["csp-report"]].filter(Boolean)
 
   for (const body of reports) {
-    if (body) console.warn(`[csp-violation] ${stripForLog(summarise(body), 1024)}`)
+    if (!body) continue
+    const summary = stripForLog(summarise(body), 1024)
+    // stripForLog above already removes control characters including \n and \r,
+    // but we strip again here so static analysers recognise the barrier.
+    if (summary.includes("\n") || summary.includes("\r")) continue
+    console.warn("[csp-violation] %s", summary)
   }
 
   // 204: the reporting API ignores the body; a small empty response is enough.

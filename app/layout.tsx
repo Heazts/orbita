@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono, Lora } from "next/font/google"
 import { headers } from "next/headers"
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "@/lib/site"
+import { ErrorBoundary } from "@/components/error-boundary"
 import { ServiceWorkerRegister } from "./sw-register"
 import "./globals.css"
 
@@ -92,13 +93,15 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // header — required for these inline scripts to run without 'unsafe-inline'.
   const nonce = (await headers()).get("x-nonce") ?? undefined
   return (
-    <html lang="pt-BR" suppressHydrationWarning className={`bg-background ${geist.variable} ${geistMono.variable} ${lora.variable}`}>
+    <html lang="pt-BR" suppressHydrationWarning className={`${geist.variable} ${geistMono.variable} ${lora.variable}`}>
       <head>
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('orbita-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');else document.documentElement.classList.add('light')}catch(e){}})()` }} />
         <script nonce={nonce} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       </head>
       <body className="font-sans antialiased">
-        {children}
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
         <ServiceWorkerRegister />
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
