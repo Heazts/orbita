@@ -38,19 +38,11 @@ export type RateLimitResult = {
 }
 
 export function checkRateLimit(clientId: string, now: number = Date.now()): RateLimitResult {
-  // Occasionally sweep buckets whose timestamps are all stale so the map
-  // doesn't grow unbounded across many distinct IPs.
-  if (Math.random() < 0.02) {
-    for (const [key, timestamps] of requestLog) {
-      if (timestamps.every((timestamp) => now - timestamp >= RATE_LIMIT_WINDOW_MS)) requestLog.delete(key)
-    }
-  }
   const recent = (requestLog.get(clientId) ?? []).filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS)
   recent.push(now)
   requestLog.set(clientId, recent)
   const limited = recent.length > RATE_LIMIT_MAX_REQUESTS
   const remaining = Math.max(0, RATE_LIMIT_MAX_REQUESTS - recent.length)
-  // When limited, wait until the oldest request in the window expires.
   const retryAfterSeconds = limited ? Math.max(1, Math.ceil((RATE_LIMIT_WINDOW_MS - (now - recent[0])) / 1000)) : 0
   return { limited, remaining, retryAfterSeconds }
 }

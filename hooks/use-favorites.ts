@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback } from "react"
+import { useEffect, useCallback } from "react"
 import type { NewsItem } from "@/lib/news"
 import { writeStore } from "@/lib/storage"
 import { useHydratedState } from "@/hooks/use-hydrated-state"
@@ -16,9 +16,13 @@ export function useFavorites(): {
       const next = { ...current }
       if (next[item.id]) delete next[item.id]
       else next[item.id] = item
-      writeStore("orbita-favorites", next)
       return next
     })
   }, [setFavorites])
+
+  useEffect(() => {
+    writeStore("orbita-favorites", favorites)
+  }, [favorites])
+
   return { favorites, toggleFavorite, favoritesCount: Object.keys(favorites).length }
 }

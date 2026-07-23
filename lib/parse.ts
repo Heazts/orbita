@@ -102,7 +102,12 @@ export function parseFeed(xml: string, source: FeedSource, isGoogle = false): Ne
     .map((item): NewsItem | null => {
       const rawTitle = plainText(textValue(item.title))
       const url = findLink(item)
-      if (!rawTitle || !/^https?:\/\//.test(url)) return null
+      if (!rawTitle || !/^https:\/\//.test(url)) return null
+
+      const trimmedUrl = url.trim()
+      if (!HTTPS_URL.test(trimmedUrl)) return null
+
+      const safeUrl = trimmedUrl
 
       const googleSource = plainText(textValue(item.source))
       const title =
@@ -125,10 +130,10 @@ export function parseFeed(xml: string, source: FeedSource, isGoogle = false): Ne
       const date = new Date(rawDate)
 
       return {
-        id: url,
+        id: safeUrl,
         title,
         description: description.slice(0, 300),
-        url,
+        url: safeUrl,
         image: findImage(item),
         source: googleSource || source.name,
         category: inferCategory(`${title} ${description}`, source.category),

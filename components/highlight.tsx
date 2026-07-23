@@ -12,9 +12,10 @@ export function Highlight({ text, query }: HighlightProps) {
     const terms = query.trim().split(/\s+/).filter((term) => term.length > 1)
     if (!terms.length) return null
     const escaped = terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    const pattern = `(${escaped.join("|")})`
     return {
-      regex: new RegExp(`(${escaped.join("|")})`, "gi"),
-      matches: new RegExp(`^(${escaped.join("|")})$`, "i"),
+      regex: new RegExp(pattern, "gi"),
+      matches: new RegExp(`^${pattern}$`, "i"),
     }
   }, [query])
 

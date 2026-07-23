@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback } from "react"
+import { useEffect, useCallback } from "react"
 import { writeStore } from "@/lib/storage"
 import { useHydratedState } from "@/hooks/use-hydrated-state"
 
@@ -16,11 +16,15 @@ export function useSearchHistory(maxEntries = 6): { history: string[]; addTerm: 
               existing.toLocaleLowerCase("pt-BR") !== term.toLocaleLowerCase("pt-BR"),
           ),
         ].slice(0, maxEntries)
-        writeStore("orbita-history", updated)
         return updated
       })
     },
     [maxEntries, setHistory],
   )
+
+  useEffect(() => {
+    writeStore("orbita-history", history)
+  }, [history])
+
   return { history, addTerm }
 }

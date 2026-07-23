@@ -16,7 +16,7 @@ export function Ticker({ items }: TickerProps) {
           const isDuplicate = index >= items.length
           return (
             <a
-              key={`${item.id}-${index}`}
+              key={item.id}
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"

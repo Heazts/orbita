@@ -138,16 +138,27 @@ function codePointToString(value: number): string {
   return Number.isFinite(value) && value >= 0 && value <= 0x10ffff ? String.fromCodePoint(value) : ""
 }
 
+const ENTITY_MAP: Record<string, string> = {
+  "&nbsp;": " ",
+  "&quot;": '"',
+  "&#39;": "'",
+  "&apos;": "'",
+  "&lt;": "<",
+  "&gt;": ">",
+  "&amp;": "&",
+}
+
+const HEX_ENTITY = /&#x([0-9a-fA-F]+);/g
+const DEC_ENTITY = /&#(\d+);/g
+
 export function decodeEntities(value: string): string {
-  return value
-    .replace(/&nbsp;/g, " ")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex: string) => codePointToString(Number.parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, dec: string) => codePointToString(Number.parseInt(dec, 10)))
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&")
+  let text = value
+  for (const [entity, char] of Object.entries(ENTITY_MAP)) {
+    text = text.split(entity).join(char)
+  }
+  text = text.replace(HEX_ENTITY, (_, hex) => codePointToString(Number.parseInt(hex, 16)))
+  text = text.replace(DEC_ENTITY, (_, dec) => codePointToString(Number.parseInt(dec, 10)))
+  return text
 }
 
 // Some feeds (e.g. Agência Brasil) double-encode embedded HTML, so literal
@@ -171,15 +182,16 @@ export function inferCategory(
   title: string,
   fallback: FeedSource["category"],
 ): FeedSource["category"] {
-  // Use the same normalize() function as relevance() for consistency:
-  // lowercase + NFD decomposition + strip diacritics.
   const normalized = normalize(title)
-  if (/econom|mercado|inflacao|banco|juros|empresa|negocio/.test(normalized)) return "Economia"
-  if (/tecnolog|digital|internet|inteligencia artificial|software|celular/.test(normalized)) return "Tecnologia"
-  if (/saude|vacina|hospital|doenca|medic|remedio|sus|virus|pandemia/.test(normalized)) return "Saúde"
-  if (/futebol|copa|olimpi|campeonato|jogador|tecnico|placar|gol|esporte|atleta/.test(normalized)) return "Esportes"
-  if (/ciencia|espaco|nasa|pesquisa|clima|estudo|astronomia/.test(normalized)) return "Ciência"
-  if (/cultura|cinema|musica|livro|arte|festival/.test(normalized)) return "Cultura"
-  if (/governo|eleicao|presidente|congresso|politica|ministro/.test(normalized)) return "Política"
-  return fallback
+  const rules: Array<{ test: RegExp; category: FeedSource["category"] }> = [
+    { test: /econom|mercado|inflacao|banco|juros|empresa|negocio/, category: "Economia" },
+    { test: /tecnolog|digital|internet|inteligencia artificial|software|celular/, category: "Tecnologia" },
+    { test: /saude|vacina|hospital|doenca|medic|remedio|sus|virus|pandemia/, category: "Saúde" },
+    { test: /futebol|copa|olimpi|campeonato|jogador|tecnico|placar|gol|esporte|atleta/, category: "Esportes" },
+    { test: /ciencia|espaco|nasa|pesquisa|clima|estudo|astronomia/, category: "Ciência" },
+    { test: /cultura|cinema|musica|livro|arte|festival/, category: "Cultura" },
+    { test: /governo|eleicao|presidente|congresso|politica|ministro/, category: "Política" },
+  ]
+  const match = rules.find(({ test }) => test.test(normalized))
+  return match?.category ?? fallback
 }

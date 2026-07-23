@@ -13,10 +13,12 @@ import {
   Sun,
   X,
 } from "lucide-react"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useFavorites } from "@/hooks/use-favorites"
 import { useNow } from "@/hooks/use-now"
 import { useSearchHistory } from "@/hooks/use-search-history"
+import { useDebouncedQuery } from "@/hooks/use-debounced-query"
+import { useSearchShortcut } from "@/hooks/use-search-shortcut"
 import { useTheme } from "@/hooks/use-theme"
 import { FALLBACK_NEWS, NEWS_CATEGORIES, type NewsCategory, type NewsItem, type NewsResponse } from "@/lib/news"
 import { IconButton } from "@/components/ui/icon-button"
@@ -50,6 +52,17 @@ const CURRENT_YEAR = new Date().getFullYear()
 type Period = "all" | "1" | "7" | "30"
 type Sort = "latest" | "relevance"
 
+function buildApiUrl(query: string, category: NewsCategory, period: Period, sort: Sort, source: string): string {
+  const searchParams = new URLSearchParams()
+  if (query) searchParams.set("q", query)
+  if (category !== "Todas") searchParams.set("category", category)
+  if (period !== "all") searchParams.set("period", period)
+  if (sort !== "latest") searchParams.set("sort", sort)
+  if (source !== "Todas") searchParams.set("source", source)
+  const queryString = searchParams.toString()
+  return `/api/news${queryString ? `?${queryString}` : ""}`
+}
+
 export function NewsDashboard() {
   const searchRef = useRef<HTMLInputElement>(null)
   const now = useNow()
@@ -60,7 +73,6 @@ export function NewsDashboard() {
     if (typeof window === "undefined") return ""
     return new URLSearchParams(window.location.search).get("q")?.trim() ?? ""
   })
-  const [query, setQuery] = useState("")
   const [category, setCategory] = useState<NewsCategory>("Todas")
   const [period, setPeriod] = useState<Period>("all")
   const [sort, setSort] = useState<Sort>("latest")
@@ -81,16 +93,18 @@ export function NewsDashboard() {
     [now],
   )
 
-  const searchParams = new URLSearchParams()
-  if (query) searchParams.set("q", query)
-  if (category !== "Todas") searchParams.set("category", category)
-  if (period !== "all") searchParams.set("period", period)
-  if (sort !== "latest") searchParams.set("sort", sort)
-  if (source !== "Todas") searchParams.set("source", source)
-  const queryString = searchParams.toString()
-  const apiUrl = `/api/news${queryString ? `?${queryString}` : ""}`
+  useSearchShortcut(searchRef)
+
+  const query = useDebouncedQuery(input, addTerm)
+
+  const apiUrl = useMemo(
+    () => buildApiUrl(query, category, period, sort, source),
+    [query, category, period, sort, source],
+  )
+
   const showFallback =
     now !== null && !query && category === "Todas" && period === "all" && source === "Todas"
+
   const { data, error, isLoading, isValidating, mutate } = useSWR<NewsResponse>(apiUrl, fetcher, {
     refreshInterval: 5 * 60_000,
     refreshWhenHidden: false,
@@ -106,31 +120,10 @@ export function NewsDashboard() {
   })
 
   useEffect(() => {
-    const handleShortcut = (event: KeyboardEvent) => {
-      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return
-      const target = event.target as HTMLElement | null
-      if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return
-      event.preventDefault()
-      searchRef.current?.focus()
-    }
-    window.addEventListener("keydown", handleShortcut)
-    return () => window.removeEventListener("keydown", handleShortcut)
-  }, [])
-
-  useEffect(() => {
     const onScroll = () => setShowTop(window.scrollY > 600)
     window.addEventListener("scroll", onScroll, { passive: true })
     return () => window.removeEventListener("scroll", onScroll)
   }, [])
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      const next = input.trim()
-      setQuery(next)
-      if (next.length > 1) addTerm(next)
-    }, 450)
-    return () => window.clearTimeout(timeout)
-  }, [input, addTerm])
 
   const sources = useMemo(
     () => ["Todas", ...Array.from(new Set((data?.items ?? []).map((item) => item.source))).sort()],
@@ -145,7 +138,7 @@ export function NewsDashboard() {
       )
     : data?.items ?? []
 
-  const share = async (item: NewsItem) => {
+  const share = useCallback(async (item: NewsItem) => {
     try {
       if (navigator.share) {
         await navigator.share({ title: item.title, url: item.url })
@@ -157,17 +150,16 @@ export function NewsDashboard() {
       setNotice("Não foi possível compartilhar")
     }
     window.setTimeout(() => setNotice(""), 2500)
-  }
+  }, [])
 
-  const clear = () => {
+  const clear = useCallback(() => {
     setInput("")
-    setQuery("")
     setCategory("Todas")
     setPeriod("all")
     setSort("latest")
     setSource("Todas")
     setFavoritesOnly(false)
-  }
+  }, [])
 
   return (
     <div className="min-h-screen bg-background text-foreground">
