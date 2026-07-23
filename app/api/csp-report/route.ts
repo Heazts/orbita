@@ -22,21 +22,13 @@ type CspBody = {
   blockedURL?: string
 }
 
-// Report fields are attacker-controlled, so strip control characters and cap the
-// length. \r and \n are listed explicitly (in addition to the \x00-\x1f range
-// that already covers them) so static analysers recognise the newline-stripping
-// as a log-forging barrier. Used per field and again at the log sink.
-function stripForLog(value: unknown, maxLength: number): string {
+// Report fields are attacker-controlled, so strip control characters and cap
+// the length. Only printable ASCII (\x20-\x7e) survives — everything else is
+// replaced so the value is safe for structured logging (CodeQL js/log-injection).
+function sanitize(value: unknown, maxLength: number): string {
   if (typeof value !== "string") return "unknown"
-  const sanitized = value.replace(/[\r\n\x00-\x1f\x7f\x80-\x9f]+/g, " ").trim()
+  const sanitized = value.replace(/[^\x20-\x7e]/g, "_").trim()
   return sanitized.length > maxLength ? sanitized.slice(0, maxLength) : sanitized || "unknown"
-}
-
-function summarise(body: CspBody): string {
-  const directive = stripForLog(body["violated-directive"] ?? body.effectiveDirective, 256)
-  const blocked = stripForLog(body["blocked-uri"] ?? body.blockedURL, 256)
-  const documentUri = stripForLog(body["document-uri"] ?? body.documentURL, 256)
-  return `directive=${directive} blocked=${blocked} document=${documentUri}`
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -63,13 +55,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   for (const body of reports) {
     if (!body) continue
-    const summary = stripForLog(summarise(body), 1024)
-    // Defense in depth: stripForLog above already removes control characters,
-    // including `\n` and `\r`. We check again here so static analysers and
-    // runtime safeguards both see the log-forging barrier.
-    const safeSummary = summary.replace(/[\r\n\x00-\x1f\x7f\x80-\x9f]+/g, " ").trim()
-    if (!safeSummary || safeSummary !== summary) continue
-    console.warn("[csp-violation] %s", safeSummary)
+    // Each field is attacker-controlled — sanitize replaces all non-printable
+    // characters with '_' so the log line is pure ASCII.
+    const directive = sanitize(body["violated-directive"] ?? body.effectiveDirective, 256)
+    const blocked = sanitize(body["blocked-uri"] ?? body.blockedURL, 256)
+    const documentUri = sanitize(body["document-uri"] ?? body.documentURL, 256)
+    console.warn("[csp-violation] directive=%s blocked=%s document=%s", directive, blocked, documentUri)
   }
 
   // 204: the reporting API ignores the body; a small empty response is enough.

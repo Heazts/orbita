@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import {
   FALLBACK_NEWS,
   FEED_SOURCES,
+  NEWS_CATEGORIES,
   normalize,
   plainText,
   type FeedSource,
@@ -83,8 +84,11 @@ export async function GET(request: NextRequest) {
   }
   const params = request.nextUrl.searchParams
   const query = plainText(params.get("q") ?? "").slice(0, 120)
-  const category = plainText(params.get("category") ?? "Todas")
-  const source = plainText(params.get("source") ?? "Todas")
+  const rawCategory = plainText(params.get("category") ?? "Todas")
+  const category = NEWS_CATEGORIES.includes(rawCategory as typeof NEWS_CATEGORIES[number]) ? rawCategory : "Todas"
+  const sourceNames = new Set(["Todas", ...FEED_SOURCES.map((s) => s.name)])
+  const rawSource = plainText(params.get("source") ?? "Todas")
+  const source = sourceNames.has(rawSource) ? rawSource : "Todas"
   const period = params.get("live") === "true" ? "live" : ["1", "7", "30"].includes(params.get("period") ?? "") ? Number(params.get("period")) : 0
   const sort = params.get("sort") === "relevance" ? "relevance" : "latest"
 
