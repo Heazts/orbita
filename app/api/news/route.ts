@@ -132,7 +132,12 @@ export async function GET(request: NextRequest) {
     ...(isLivePeriod && !query ? { isLive: true } : {}),
     ...(failedSources.length ? { failedSources } : {}),
   }
+  // Live mode needs fresh data — skip the 5-minute CDN cache so the client's
+  // 30-second SWR interval actually fetches new feed data.
+  const cacheControl = isLivePeriod
+    ? "private, no-cache, must-revalidate"
+    : "public, s-maxage=300, stale-while-revalidate=600"
   return NextResponse.json(payload, {
-    headers: { ...rateHeaders, "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
+    headers: { ...rateHeaders, "Cache-Control": cacheControl },
   })
 }

@@ -8,17 +8,26 @@ type NewsImageProps = {
 }
 
 export function NewsImage({ src, lead }: NewsImageProps) {
+  const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
+
   if (failed) return null
+
   return (
-    <img
-      src={src}
-      alt=""
-      loading="lazy"
-      decoding="async"
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
-      className={lead ? "aspect-video w-full rounded-lg object-cover" : "aspect-square size-20 shrink-0 rounded-lg object-cover sm:size-24"}
-    />
+    <div className={`relative overflow-hidden ${lead ? "aspect-video w-full rounded-xl" : "size-20 shrink-0 rounded-xl sm:size-24"}`}>
+      {!loaded && (
+        <div className="absolute inset-0 animate-pulse bg-muted" />
+      )}
+      <img
+        src={src}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        onLoad={() => setLoaded(true)}
+        onError={() => setFailed(true)}
+        className={`h-full w-full object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
+      />
+    </div>
   )
 }

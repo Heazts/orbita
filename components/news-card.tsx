@@ -17,6 +17,11 @@ function relativeTime(value: string, now: number | null) {
   return `há ${Math.floor(minutes / 1440)}d`
 }
 
+function isNew(value: string, now: number | null): boolean {
+  if (now === null) return false
+  return now - Date.parse(value) < 30 * 60_000
+}
+
 function Actions({
   item,
   favorite,
@@ -29,7 +34,7 @@ function Actions({
   share: () => void
 }) {
   return (
-    <div className="relative flex items-center gap-2">
+    <div className="relative flex items-center gap-1.5">
       <IconButton
         label={favorite ? "Remover dos favoritos" : "Salvar nos favoritos"}
         active={favorite}
@@ -64,27 +69,46 @@ type NewsCardProps = {
 }
 
 export function NewsCard({ item, now, query, favorite, onFavorite, onShare, lead = false }: NewsCardProps) {
+  const itemIsNew = isNew(item.publishedAt, now)
+
   const content = (
     <>
-      <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider opacity-70">
-        <span>{item.category}</span>
-        <span aria-hidden="true">•</span>
-        <span>{item.source}</span>
-        <span aria-hidden="true">•</span>
-        <time dateTime={item.publishedAt}>{relativeTime(item.publishedAt, now)}</time>
+      <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider">
+        {itemIsNew && (
+          <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-bold text-destructive">
+            Novo
+          </span>
+        )}
+        <span className={lead ? "opacity-80" : "opacity-60"}>{item.category}</span>
+        <span className={lead ? "opacity-40" : "opacity-30"} aria-hidden="true">·</span>
+        <span className={lead ? "opacity-80" : "opacity-60"}>{item.source}</span>
+        <span className={lead ? "opacity-40" : "opacity-30"} aria-hidden="true">·</span>
+        <time
+          dateTime={item.publishedAt}
+          className={lead ? "opacity-80" : "opacity-60"}
+        >
+          {relativeTime(item.publishedAt, now)}
+        </time>
       </div>
       <h2
-        className={`text-balance font-serif font-bold leading-tight ${lead ? "text-3xl md:text-5xl" : "text-xl md:text-2xl"}`}
+        className={`text-balance font-serif font-bold leading-tight ${lead ? "text-2xl md:text-4xl lg:text-5xl" : "text-lg md:text-xl"}`}
       >
         <Highlight text={item.title} query={query} />
       </h2>
       {item.description && (
-        <p className={`text-pretty leading-relaxed ${lead ? "max-w-3xl opacity-75" : "text-sm text-muted-foreground"}`}>
+        <p className={`text-pretty leading-relaxed ${lead ? "max-w-3xl text-base opacity-75 md:text-lg" : "text-sm text-muted-foreground"}`}>
           <Highlight text={item.description} query={query} />
         </p>
       )}
-      <div className="flex items-center justify-between gap-4">
-        <span className="text-xs opacity-60">Fonte original</span>
+      <div className="flex items-center justify-between gap-4 pt-1">
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+        >
+          {item.source} ↗
+        </a>
         <Actions item={item} favorite={favorite} toggleFavorite={onFavorite} share={onShare} />
       </div>
     </>
@@ -92,7 +116,7 @@ export function NewsCard({ item, now, query, favorite, onFavorite, onShare, lead
 
   if (lead) {
     return (
-      <article className="flex flex-col gap-5 rounded-xl bg-primary p-6 text-primary-foreground md:p-9">
+      <article className="group flex flex-col gap-5 overflow-hidden rounded-2xl bg-primary p-6 text-primary-foreground transition-shadow hover:shadow-xl md:p-8 lg:p-9">
         {item.image && <NewsImage src={item.image} lead />}
         {content}
       </article>
@@ -100,9 +124,9 @@ export function NewsCard({ item, now, query, favorite, onFavorite, onShare, lead
   }
 
   return (
-    <article className="flex gap-4 border-b py-6 last:border-0">
+    <article className="group flex gap-4 border-b py-5 transition-colors last:border-0 hover:bg-muted/30 md:py-6">
       {item.image && <NewsImage src={item.image} />}
-      <div className="flex min-w-0 flex-1 flex-col gap-4">{content}</div>
+      <div className="flex min-w-0 flex-1 flex-col gap-3">{content}</div>
     </article>
   )
 }
