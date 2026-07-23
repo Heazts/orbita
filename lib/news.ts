@@ -8,6 +8,8 @@ export const NEWS_CATEGORIES = [
   "Saúde",
   "Esportes",
   "Cultura",
+  "Entretenimento",
+  "Meio Ambiente",
 ] as const
 
 export type NewsCategory = (typeof NEWS_CATEGORIES)[number]
@@ -28,6 +30,7 @@ export type NewsResponse = {
   updatedAt: string
   sourceCount: number
   isFallback?: boolean
+  isLive?: boolean
   // Names of feed sources that failed to load for this response, so the client
   // can tell the user some sources are temporarily unavailable.
   failedSources?: string[]
@@ -79,6 +82,16 @@ export const FEED_SOURCES: FeedSource[] = [
     name: "Agência Brasil — Saúde",
     url: "https://agenciabrasil.ebc.com.br/rss/saude/feed.xml",
     category: "Saúde",
+  },
+  {
+    name: "Natureza — Meio Ambiente",
+    url: "https://www.wwf.org.br/rss.xml",
+    category: "Meio Ambiente",
+  },
+  {
+    name: "G1 — Entretenimento",
+    url: "https://g1.globo.com/rss/feed entretenimento.xml",
+    category: "Entretenimento",
   },
 ]
 

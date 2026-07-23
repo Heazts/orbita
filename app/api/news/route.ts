@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
   const query = plainText(params.get("q") ?? "").slice(0, 120)
   const category = plainText(params.get("category") ?? "Todas")
   const source = plainText(params.get("source") ?? "Todas")
-  const period = ["1", "7", "30"].includes(params.get("period") ?? "") ? Number(params.get("period")) : 0
+  const period = params.get("live") === "true" ? "live" : ["1", "7", "30"].includes(params.get("period") ?? "") ? Number(params.get("period")) : 0
   const sort = params.get("sort") === "relevance" ? "relevance" : "latest"
 
   // Local feeds and the Google search run concurrently — previously the
@@ -105,7 +105,9 @@ export async function GET(request: NextRequest) {
   // stops valid results from disappearing when the query omits accents.
   const googleUrls = new Set(googleItems.map((item) => item.url))
   const terms = normalize(query).split(/\s+/).filter((term) => term.length > 1)
-  const cutoff = period ? Date.now() - period * 86_400_000 : 0
+  const isLivePeriod = period === "live"
+  const cutoffHours = isLivePeriod ? 2 : typeof period === "number" ? period * 24 : 0
+  const cutoff = cutoffHours ? Date.now() - cutoffHours * 3_600_000 : 0
   const byRelevance = sort === "relevance" && query.length > 0
   const combined = [...googleItems, ...localItems]
 
@@ -127,6 +129,7 @@ export async function GET(request: NextRequest) {
     updatedAt: new Date().toISOString(),
     sourceCount: new Set(items.map((item) => item.source)).size,
     isFallback: !query && unique.length === 0,
+    ...(isLivePeriod && !query ? { isLive: true } : {}),
     ...(failedSources.length ? { failedSources } : {}),
   }
   return NextResponse.json(payload, {

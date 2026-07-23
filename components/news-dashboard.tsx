@@ -49,14 +49,19 @@ const SUGGESTIONS = [
 
 const CURRENT_YEAR = new Date().getFullYear()
 
-type Period = "all" | "1" | "7" | "30"
+type Period = "all" | "1" | "7" | "30" | "live"
 type Sort = "latest" | "relevance"
 
 function buildApiUrl(query: string, category: NewsCategory, period: Period, sort: Sort, source: string): string {
   const searchParams = new URLSearchParams()
   if (query) searchParams.set("q", query)
   if (category !== "Todas") searchParams.set("category", category)
-  if (period !== "all") searchParams.set("period", period)
+  if (period === "live") {
+    searchParams.set("period", "1")
+    searchParams.set("live", "true")
+  } else if (period !== "all") {
+    searchParams.set("period", period)
+  }
   if (sort !== "latest") searchParams.set("sort", sort)
   if (source !== "Todas") searchParams.set("source", source)
   const queryString = searchParams.toString()
@@ -81,6 +86,8 @@ export function NewsDashboard() {
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [notice, setNotice] = useState("")
   const [showTop, setShowTop] = useState(false)
+  const [newCount, setNewCount] = useState(0)
+  const previousItemIds = useRef<string[]>([])
 
   const fallbackItems = useMemo(
     () =>
@@ -106,7 +113,7 @@ export function NewsDashboard() {
     now !== null && !query && category === "Todas" && period === "all" && source === "Todas"
 
   const { data, error, isLoading, isValidating, mutate } = useSWR<NewsResponse>(apiUrl, fetcher, {
-    refreshInterval: 5 * 60_000,
+    refreshInterval: isLivePeriod ? 30_000 : 45_000,
     refreshWhenHidden: false,
     fallbackData: showFallback
       ? {
@@ -120,6 +127,25 @@ export function NewsDashboard() {
   })
 
   useEffect(() => {
+    const currentIds = (data?.items ?? []).map((item) => item.id)
+    if (previousItemIds.current.length > 0 && currentIds.length > 0) {
+      const newItems = currentIds.filter((id) => !previousItemIds.current.includes(id))
+      if (newItems.length > 0) {
+        setNewCount((count) => count + newItems.length)
+      }
+    }
+    previousItemIds.current = currentIds
+  }, [data?.items])
+
+  useEffect(() => {
+    if (newCount > 0) {
+      const timeout = setTimeout(() => setNewCount(0), 10_000)
+      return () => clearTimeout(timeout)
+    }
+    return undefined
+  }, [newCount])
+
+  useEffect(() => {
     const onScroll = () => setShowTop(window.scrollY > 600)
     window.addEventListener("scroll", onScroll, { passive: true })
     return () => window.removeEventListener("scroll", onScroll)
@@ -130,7 +156,7 @@ export function NewsDashboard() {
     [data?.items],
   )
 
-  const tickerItems = useMemo(() => (data?.items ?? []).slice(0, 8), [data?.items])
+  const tickerItems = useMemo(() => (data?.items ?? []).slice(0, 12), [data?.items])
 
   const items = favoritesOnly
     ? Object.values(favorites).sort(
@@ -185,9 +211,19 @@ export function NewsDashboard() {
             >
               {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
             </IconButton>
-            <IconButton label="Atualizar notícias" onClick={() => void mutate()}>
-              <RefreshCw className={`size-4 ${isValidating ? "motion-safe:animate-spin" : ""}`} />
-            </IconButton>
+            <div className="relative">
+              <IconButton label="Atualizar notícias" onClick={() => { setNewCount(0); void mutate() }}>
+                <RefreshCw className={`size-4 ${isValidating ? "motion-safe:animate-spin" : ""}`} />
+              </IconButton>
+              {newCount > 0 && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white"
+                >
+                  {newCount > 99 ? "99+" : newCount}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div className="mx-auto max-w-7xl px-5 pb-4 md:px-8">
@@ -266,6 +302,7 @@ export function NewsDashboard() {
                   className="rounded-lg border bg-background p-2 text-sm font-normal"
                 >
                   <option value="all">Qualquer data</option>
+                  <option value="live">Ao vivo</option>
                   <option value="1">Últimas 24 horas</option>
                   <option value="7">Últimos 7 dias</option>
                   <option value="30">Últimos 30 dias</option>
@@ -321,6 +358,17 @@ export function NewsDashboard() {
       </nav>
 
       <main id="conteudo" className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-8 md:px-8">
+        {newCount > 0 && !favoritesOnly && !query && (
+          <button
+            type="button"
+            onClick={() => { setNewCount(0); void mutate() }}
+            className="flex w-full items-center justify-center gap-2 rounded-full border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm font-bold text-destructive hover:bg-destructive/20"
+          >
+            <RefreshCw className="size-4" />
+            {newCount} novas matérias — clique para atualizar
+          </button>
+        )}
+
         <div className="flex flex-wrap items-end justify-between gap-4 border-b-2 border-primary pb-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-destructive">
