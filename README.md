@@ -1,5 +1,9 @@
 # Órbita — Notícias do mundo ao vivo
 
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10000/badge)](https://www.bestpractices.dev/projects/10000)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/Heazts/orbita/badge)](https://securityscorecards.dev/viewer/?uri=github.com/Heazts/orbita)
+[![CodeQL](https://github.com/Heazts/orbita/actions/workflows/codeql.yml/badge.svg)](https://github.com/Heazts/orbita/actions/workflows/codeql.yml)
+
 Painel de notícias em português que agrega manchetes de fontes públicas (BBC Brasil, DW Brasil, Euronews, Agência Brasil, Olhar Digital, NASA) e permite pesquisar qualquer assunto via Google News. Construído com Next.js (App Router) e React.
 
 ## Stack

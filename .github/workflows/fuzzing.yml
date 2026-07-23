@@ -1,0 +1,42 @@
+name: Fuzzing
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions: read-all
+
+jobs:
+  fuzz:
+    name: Fuzz parsing utilities
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Jazzer.js
+        run: pnpm add -D jazzerjs @jazzer.js/core
+
+      - name: Fuzz parseFeed
+        run: |
+          timeout 120 pnpm jazzer --target_target_class=parseFeed \
+            tests/fuzz/parse-feed-fuzz.js || true
+
+      - name: Fuzz plainText
+        run: |
+          timeout 60 pnpm jazzer --target_target_class=plainText \
+            tests/fuzz/plaintext-fuzz.js || true
