@@ -1,0 +1,6 @@
+# OSV-Scanner configuration
+# https://google.github.io/osv-scanner/config/
+
+[[IgnoredVulns]]
+id = "GHSA-f88m-g3jw-g9cj"
+reason = "Sharp is an optional unused sub-dependency in Next.js build setup"

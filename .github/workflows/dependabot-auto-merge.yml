@@ -6,7 +6,7 @@ name: Dependabot auto-merge
 # nothing to gate the merge on. Major updates are always left for manual review.
 on: pull_request
 
-permissions: {}
+permissions: read-all
 
 jobs:
   auto-merge:

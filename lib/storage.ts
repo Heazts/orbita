@@ -3,7 +3,9 @@
 export function readStore<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key)
-    return raw ? (JSON.parse(raw) as T) : fallback
+    if (!raw) return fallback
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === typeof fallback ? (parsed as T) : fallback
   } catch {
     return fallback
   }
