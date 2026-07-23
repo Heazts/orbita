@@ -84,13 +84,13 @@ export const FEED_SOURCES: FeedSource[] = [
     category: "Saúde",
   },
   {
-    name: "Natureza — Meio Ambiente",
-    url: "https://www.wwf.org.br/rss.xml",
+    name: "G1 — Natureza",
+    url: "https://g1.globo.com/rss/g1/natureza/",
     category: "Meio Ambiente",
   },
   {
-    name: "G1 — Entretenimento",
-    url: "https://g1.globo.com/rss/feed entretenimento.xml",
+    name: "G1 — Pop & Arte",
+    url: "https://g1.globo.com/rss/g1/pop-arte/",
     category: "Entretenimento",
   },
 ]
@@ -201,8 +201,10 @@ export function inferCategory(
     { test: /tecnolog|digital|internet|inteligencia artificial|software|celular/, category: "Tecnologia" },
     { test: /saude|vacina|hospital|doenca|medic|remedio|sus|virus|pandemia/, category: "Saúde" },
     { test: /futebol|copa|olimpi|campeonato|jogador|tecnico|placar|gol|esporte|atleta/, category: "Esportes" },
+    { test: /meio ambiente|desmatamento|amazonia|sustentab|poluicao|biodiversidade|aquecimento global/, category: "Meio Ambiente" },
     { test: /ciencia|espaco|nasa|pesquisa|clima|estudo|astronomia/, category: "Ciência" },
     { test: /cultura|cinema|musica|livro|arte|festival/, category: "Cultura" },
+    { test: /entretenimento|celebridade|novela|famoso|reality|serie|streaming/, category: "Entretenimento" },
     { test: /governo|eleicao|presidente|congresso|politica|ministro/, category: "Política" },
   ]
   const match = rules.find(({ test }) => test.test(normalized))

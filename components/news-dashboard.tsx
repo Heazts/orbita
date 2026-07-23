@@ -224,7 +224,7 @@ export function NewsDashboard() {
         </div>
       )}
 
-      {tickerItems.length > 0 && <Ticker items={tickerItems} isLive={isLivePeriod} />}
+      {tickerItems.length > 0 && <Ticker items={tickerItems} isLive={isLivePeriod} now={now} />}
 
       <CategoriesNav
         category={category}

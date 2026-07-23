@@ -58,8 +58,8 @@ A interface é mobile-first com Tailwind (`sm:`/`md:`/`lg:`), testada em 320px, 
 
 ## Funcionalidades
 
-- Agrega BBC Brasil, DW Brasil, Euronews, Agência Brasil, Olhar Digital, NASA, GE (Globo Esporte) e Agência Brasil Saúde, com busca global via Google News.
-- Categorias: Mundo, Política, Economia, Tecnologia, Ciência, Saúde, Esportes e Cultura, inferidas por palavra-chave a partir do título/descrição.
+- Agrega BBC Brasil, DW Brasil, Euronews, Agência Brasil, Olhar Digital, NASA, GE (Globo Esporte), Agência Brasil Saúde, G1 Natureza e G1 Pop & Arte, com busca global via Google News.
+- Categorias: Mundo, Política, Economia, Tecnologia, Ciência, Saúde, Esportes, Cultura, Entretenimento e Meio Ambiente, inferidas por palavra-chave a partir do título/descrição.
 - Busca insensível a acentos (ex.: "eleicao" encontra "eleição") que sempre preserva os resultados do Google. Aceita deep link `?q=termo` (também alvo do `SearchAction` no JSON-LD), gerando URLs de busca compartilháveis.
 - Filtros por categoria, período, fonte e ordenação (mais recentes/mais relevantes); favoritos (com contador) e histórico de busca persistidos em `localStorage`.
 - Quando alguma fonte de feed está indisponível, um aviso discreto lista quais fontes falharam (o payload da API expõe `failedSources`), sem quebrar o restante do painel.

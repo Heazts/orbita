@@ -3,6 +3,7 @@ import type { NewsItem } from "@/lib/news"
 type TickerProps = {
   items: NewsItem[]
   isLive: boolean
+  now: number | null
 }
 
 function relativeTime(publishedAt: string, now: number): string {
@@ -15,9 +16,8 @@ function relativeTime(publishedAt: string, now: number): string {
   return `${Math.floor(hours / 24)}d`
 }
 
-export function Ticker({ items, isLive }: TickerProps) {
-  const now = Date.now()
-  const recentItems = isLive
+export function Ticker({ items, isLive, now }: TickerProps) {
+  const recentItems = isLive && now !== null
     ? items.filter((item) => now - Date.parse(item.publishedAt) < 2 * 60 * 60_000)
     : items
 
@@ -52,9 +52,11 @@ export function Ticker({ items, isLive }: TickerProps) {
                 {isLive && (
                   <span className="live-dot size-1.5 shrink-0 rounded-full bg-destructive" aria-hidden="true" />
                 )}
-                <span className="text-foreground/40" aria-hidden="true">
-                  {relativeTime(item.publishedAt, now)}
-                </span>
+                {now !== null && (
+                  <span className="text-foreground/40" aria-hidden="true">
+                    {relativeTime(item.publishedAt, now)}
+                  </span>
+                )}
                 <span>{item.title}</span>
               </a>
             )
