@@ -64,10 +64,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   for (const body of reports) {
     if (!body) continue
     const summary = stripForLog(summarise(body), 1024)
-    // stripForLog above already removes control characters including \n and \r,
-    // but we strip again here so static analysers recognise the barrier.
-    if (summary.includes("\n") || summary.includes("\r")) continue
-    console.warn("[csp-violation] %s", summary)
+    // Defense in depth: stripForLog above already removes control characters,
+    // including `\n` and `\r`. We check again here so static analysers and
+    // runtime safeguards both see the log-forging barrier.
+    const safeSummary = summary.replace(/[\r\n\x00-\x1f\x7f\x80-\x9f]+/g, " ").trim()
+    if (!safeSummary || safeSummary !== summary) continue
+    console.warn("[csp-violation] %s", safeSummary)
   }
 
   // 204: the reporting API ignores the body; a small empty response is enough.
