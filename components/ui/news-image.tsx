@@ -18,6 +18,7 @@ export function NewsImage({ src, lead }: NewsImageProps) {
       {!loaded && (
         <div className="absolute inset-0 animate-pulse bg-muted" />
       )}
+      {/* eslint-disable-next-line @next/next/no-img-element -- <img> is intentional: next/image would proxy arbitrary feed image URLs, creating SSRF risk */}
       <img
         src={src}
         alt=""

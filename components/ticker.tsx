@@ -1,4 +1,5 @@
 import type { NewsItem } from "@/lib/news"
+import { useNow } from "@/hooks/use-now"
 
 type TickerProps = {
   items: NewsItem[]
@@ -16,7 +17,9 @@ function relativeTime(publishedAt: string, now: number): string {
 }
 
 export function Ticker({ items, isLive }: TickerProps) {
-  const now = Date.now()
+  const now = useNow(30_000)
+  if (now === null) return null
+
   const recentItems = isLive
     ? items.filter((item) => now - Date.parse(item.publishedAt) < 2 * 60 * 60_000)
     : items
