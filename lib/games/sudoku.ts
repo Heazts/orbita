@@ -157,3 +157,17 @@ export function isSolved(grid: Grid, solution: Grid): boolean {
 export function dailySeed(date: Date = new Date()): number {
   return Math.floor(date.getTime() / 86_400_000)
 }
+
+// Difficulty is expressed as how many cells are blanked out of 81. More holes
+// means fewer clues, hence a harder board.
+export type Difficulty = "facil" | "medio" | "dificil"
+
+export const DIFFICULTIES: { id: Difficulty; label: string; holes: number }[] = [
+  { id: "facil", label: "Fácil", holes: 35 },
+  { id: "medio", label: "Médio", holes: 45 },
+  { id: "dificil", label: "Difícil", holes: 52 },
+]
+
+export function holesFor(difficulty: Difficulty): number {
+  return DIFFICULTIES.find((d) => d.id === difficulty)?.holes ?? 45
+}

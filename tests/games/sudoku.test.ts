@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest"
 import {
   CELLS,
+  DIFFICULTIES,
   SIZE,
   type Grid,
   boxOf,
   dailySeed,
   findConflicts,
   generatePuzzle,
+  holesFor,
   isComplete,
   isSolved,
   scrambledSolution,
@@ -99,6 +101,25 @@ describe("isComplete / isSolved", () => {
     const wrong = [...solution]
     wrong[0] = wrong[0] === 1 ? 2 : 1
     expect(isSolved(wrong, solution)).toBe(false)
+  })
+})
+
+describe("difficulties", () => {
+  it("orders levels from more clues to fewer and stays within the board", () => {
+    const holes = DIFFICULTIES.map((d) => d.holes)
+    expect(holes).toEqual([...holes].sort((a, b) => a - b))
+    for (const h of holes) {
+      expect(h).toBeGreaterThan(0)
+      expect(h).toBeLessThan(CELLS)
+    }
+  })
+
+  it("holesFor matches the presets and generates that many blanks", () => {
+    for (const level of DIFFICULTIES) {
+      expect(holesFor(level.id)).toBe(level.holes)
+      const { puzzle } = generatePuzzle(77, holesFor(level.id))
+      expect(puzzle.filter((v) => v === 0)).toHaveLength(level.holes)
+    }
   })
 })
 
