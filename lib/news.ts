@@ -89,8 +89,8 @@ export const FEED_SOURCES: FeedSource[] = [
     category: "Meio Ambiente",
   },
   {
-    name: "G1 — Entretenimento",
-    url: "https://g1.globo.com/rss/feed entretenimento.xml",
+    name: "G1 — Pop & Arte",
+    url: "https://g1.globo.com/rss/g1/pop-arte/",
     category: "Entretenimento",
   },
 ]
