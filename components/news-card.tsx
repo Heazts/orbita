@@ -1,5 +1,6 @@
 "use client"
 
+import type { CSSProperties } from "react"
 import { Heart, Share2, ExternalLink } from "lucide-react"
 import { type NewsItem } from "@/lib/news"
 import { IconButton } from "@/components/ui/icon-button"
@@ -66,9 +67,10 @@ type NewsCardProps = {
   onFavorite: () => void
   onShare: () => void
   lead?: boolean
+  style?: CSSProperties
 }
 
-export function NewsCard({ item, now, query, favorite, onFavorite, onShare, lead = false }: NewsCardProps) {
+export function NewsCard({ item, now, query, favorite, onFavorite, onShare, lead = false, style }: NewsCardProps) {
   const itemIsNew = isNew(item.publishedAt, now)
   // Empty for undated items (publishedAt === "") or before hydration; when empty
   // we drop the time and its separator so no dangling "·" is left behind.
@@ -100,7 +102,7 @@ export function NewsCard({ item, now, query, favorite, onFavorite, onShare, lead
         <Highlight text={item.title} query={query} />
       </h2>
       {item.description && (
-        <p className={`text-pretty leading-relaxed ${lead ? "max-w-3xl text-base opacity-75 md:text-lg" : "text-sm text-muted-foreground"}`}>
+        <p className={`text-pretty leading-relaxed ${lead ? "line-clamp-3 max-w-3xl text-base opacity-75 md:text-lg" : "line-clamp-2 text-sm text-muted-foreground"}`}>
           <Highlight text={item.description} query={query} />
         </p>
       )}
@@ -120,7 +122,7 @@ export function NewsCard({ item, now, query, favorite, onFavorite, onShare, lead
 
   if (lead) {
     return (
-      <article className="group flex flex-col gap-5 overflow-hidden rounded-2xl bg-primary p-6 text-primary-foreground transition-shadow hover:shadow-xl md:p-8 lg:p-9">
+      <article style={style} className="group flex flex-col gap-5 overflow-hidden rounded-2xl bg-primary p-6 text-primary-foreground transition-shadow hover:shadow-xl md:p-8 lg:p-9">
         {item.image && <NewsImage src={item.image} lead />}
         {content}
       </article>
@@ -128,7 +130,7 @@ export function NewsCard({ item, now, query, favorite, onFavorite, onShare, lead
   }
 
   return (
-    <article className="group flex gap-4 border-b py-5 transition-colors last:border-0 hover:bg-muted/30 md:py-6">
+    <article style={style} className="group flex gap-4 border-b py-5 transition-colors last:border-0 hover:bg-muted/30 md:py-6">
       {item.image && <NewsImage src={item.image} />}
       <div className="flex min-w-0 flex-1 flex-col gap-3">{content}</div>
     </article>

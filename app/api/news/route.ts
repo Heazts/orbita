@@ -4,6 +4,7 @@ import {
   FALLBACK_NEWS,
   FEED_SOURCES,
   NEWS_CATEGORIES,
+  curateHomepage,
   normalize,
   plainText,
   type FeedSource,
@@ -133,7 +134,13 @@ export async function GET(request: NextRequest) {
     .slice(0, 100)
     .map(({ item }) => item)
 
-  const items = unique.length ? unique : query ? [] : FALLBACK_NEWS
+  // Only the untouched homepage view gets tone/diversity curation. The moment
+  // the reader searches, picks a category/source/period or goes live, we honor
+  // their intent and keep the pure chronological/relevance order above.
+  const isDefaultView =
+    !query && category === "Todas" && source === "Todas" && period === 0 && sort === "latest"
+  const ordered = isDefaultView ? curateHomepage(unique) : unique
+  const items = ordered.length ? ordered : query ? [] : FALLBACK_NEWS
   const payload: NewsResponse = {
     items,
     updatedAt: new Date().toISOString(),

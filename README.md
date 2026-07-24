@@ -58,8 +58,9 @@ A interface é mobile-first com Tailwind (`sm:`/`md:`/`lg:`), testada em 320px, 
 
 ## Funcionalidades
 
-- Agrega BBC Brasil, DW Brasil, Euronews, Agência Brasil, Olhar Digital, NASA, GE (Globo Esporte) e Agência Brasil Saúde, com busca global via Google News.
-- Categorias: Mundo, Política, Economia, Tecnologia, Ciência, Saúde, Esportes e Cultura, inferidas por palavra-chave a partir do título/descrição.
+- Agrega fontes públicas de mundo (BBC Brasil, DW Brasil, Euronews), Brasil e política (Agência Brasil), tecnologia (Olhar Digital), ciência (NASA), esportes (GE), saúde (Agência Brasil Saúde), meio ambiente (WWF, G1 Natureza), entretenimento (G1 Pop & Arte), educação (G1 Educação, Agência Brasil Educação), cibersegurança e IA (The Hacker News, CISO Advisor) e boas notícias (Razões para Acreditar), com busca global via Google News.
+- Categorias: Mundo, Boas notícias, Política, Economia, Tecnologia, Cyber & IA, Ciência, Educação, Saúde, Esportes, Cultura, Entretenimento e Meio Ambiente, inferidas por palavra-chave a partir do título/descrição.
+- **Curadoria equilibrada na home**: a visão inicial (sem filtro) abre com um destaque leve e variado e mantém o topo diverso, sem começar por uma sequência de notícias pesadas — nada é escondido, só reordenado (`curateHomepage`). Ao pesquisar, filtrar ou entrar no modo ao vivo, a ordem cronológica/relevância é respeitada.
 - Busca insensível a acentos (ex.: "eleicao" encontra "eleição") que sempre preserva os resultados do Google. Aceita deep link `?q=termo` (também alvo do `SearchAction` no JSON-LD), gerando URLs de busca compartilháveis.
 - Filtros por categoria, período, fonte e ordenação (mais recentes/mais relevantes); favoritos (com contador) e histórico de busca persistidos em `localStorage`.
 - Quando alguma fonte de feed está indisponível, um aviso discreto lista quais fontes falharam (o payload da API expõe `failedSources`), sem quebrar o restante do painel.

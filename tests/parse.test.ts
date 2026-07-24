@@ -20,6 +20,24 @@ describe("textValue", () => {
     expect(textValue({ "@_href": "https://x.com" })).toBe("https://x.com")
     expect(textValue({})).toBe("")
   })
+
+  it("flattens arrays (repeated/mixed-content nodes) instead of dropping them", () => {
+    expect(textValue(["Texto", "aqui"])).toBe("Texto aqui")
+    expect(textValue({ "#text": ["Parte 1", "Parte 2"] })).toBe("Parte 1 Parte 2")
+  })
+
+  it("concatenates children of a mixed-content node without a direct text child", () => {
+    // "Texto <b>importante</b> aqui" parses to a wrapper whose text lives in
+    // #text plus a nested <b>. The whole sentence must survive.
+    const mixed = { "#text": "Texto  aqui", b: "importante" }
+    expect(textValue(mixed)).toBe("Texto  aqui")
+    const noDirect = { b: "importante", i: "mesmo" }
+    expect(textValue(noDirect)).toBe("importante mesmo")
+  })
+
+  it("never yields the string \"[object Object]\"", () => {
+    expect(textValue({ nested: { deeper: { "@_url": "x" } } })).not.toContain("[object Object]")
+  })
 })
 
 describe("isUsableImage", () => {
