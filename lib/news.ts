@@ -191,6 +191,18 @@ export function normalize(value: string): string {
   return value.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 }
 
+// Trim to at most maxLength characters without cutting a word in half. If a
+// space is reasonably close to the limit we cut there; otherwise (a single very
+// long token) we hard-cut. Trailing punctuation/whitespace is stripped before
+// the ellipsis so we never get "palavra ,\u2026" or "palavra\u2014\u2026".
+export function truncate(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text
+  const clipped = text.slice(0, maxLength)
+  const lastSpace = clipped.lastIndexOf(" ")
+  const base = lastSpace > maxLength * 0.5 ? clipped.slice(0, lastSpace) : clipped
+  return `${base.replace(/[\s.,;:!?\u2014\u2013-]+$/, "")}\u2026`
+}
+
 export function inferCategory(
   title: string,
   fallback: FeedSource["category"],

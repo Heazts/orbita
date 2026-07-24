@@ -4,6 +4,7 @@ import {
   inferCategory,
   normalize,
   plainText,
+  truncate,
   type FeedSource,
   type NewsItem,
 } from "@/lib/news"
@@ -25,9 +26,28 @@ export function asArray<T>(value: T | T[] | undefined): T[] {
 export function textValue(value: unknown): string {
   if (typeof value === "string") return value
   if (typeof value === "number") return String(value)
+  // Repeated elements / mixed content come through as arrays (e.g. a
+  // description split around inline tags). Flatten and join them instead of
+  // dropping everything but the first node.
+  if (Array.isArray(value)) {
+    return value.map(textValue).filter(Boolean).join(" ")
+  }
   if (value && typeof value === "object") {
     const record = value as Record<string, unknown>
-    return textValue(record["#text"] ?? record._ ?? record["@_href"])
+    // Prefer explicit text/CDATA, then an Atom href.
+    const direct = record["#text"] ?? record._ ?? record["@_href"]
+    if (direct !== undefined) return textValue(direct)
+    // No direct text node: this is a mixed-content wrapper like
+    // "Texto <b>importante</b> aqui". Concatenate the text of its children so
+    // the sentence survives — and so an object never reaches a template literal
+    // as the literal string "[object Object]".
+    const parts: string[] = []
+    for (const key of Object.keys(record)) {
+      if (key.startsWith("@_")) continue
+      const child = textValue(record[key])
+      if (child) parts.push(child)
+    }
+    return parts.join(" ")
   }
   return ""
 }
@@ -132,7 +152,7 @@ export function parseFeed(xml: string, source: FeedSource, isGoogle = false): Ne
       return {
         id: safeUrl,
         title,
-        description: description.slice(0, 300),
+        description: truncate(description, 220),
         url: safeUrl,
         image: findImage(item),
         source: googleSource || source.name,

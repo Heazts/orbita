@@ -1,5 +1,6 @@
 "use client"
 
+import type { CSSProperties } from "react"
 import type { NewsItem } from "@/lib/news"
 import { NewsCard } from "@/components/news-card"
 
@@ -29,6 +30,7 @@ export function NewsList({
           now={now}
           query={query}
           lead={index === 0 && !query}
+          style={{ "--stagger": index } as CSSProperties}
           favorite={Boolean(favorites[item.id])}
           onFavorite={() => onToggleFavorite(item)}
           onShare={() => onShare(item)}

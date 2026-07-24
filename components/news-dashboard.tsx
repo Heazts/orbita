@@ -236,14 +236,18 @@ export function NewsDashboard() {
 
       <main id="conteudo" className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-6 md:px-8 md:py-8">
         {newCount > 0 && !favoritesOnly && !query && (
-          <button
-            type="button"
-            onClick={() => { setNewCount(0); void mutate() }}
-            className="flex w-full items-center justify-center gap-2 rounded-full border border-destructive/40 bg-destructive/10 px-4 py-2.5 text-sm font-bold text-destructive transition-colors hover:bg-destructive/20"
+          // Passive announcement: the new items are already in the list (SWR
+          // refreshes on an interval and the list renders the latest data), so
+          // there is nothing to click — they cascade in on their own. The pill
+          // just tells the reader what changed and auto-dismisses after 10s.
+          <div
+            role="status"
+            aria-live="polite"
+            className="mx-auto flex items-center gap-2 rounded-full border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm font-bold text-destructive"
           >
-            <RefreshCw className="size-4" />
-            {newCount} {newCount === 1 ? "nova matéria" : "novas matérias"} — clique para atualizar
-          </button>
+            <span className="live-dot size-2 rounded-full bg-destructive" aria-hidden="true" />
+            {newCount} {newCount === 1 ? "nova matéria" : "novas matérias"}
+          </div>
         )}
 
         <div className="flex flex-wrap items-end justify-between gap-4 border-b-2 border-primary pb-4">

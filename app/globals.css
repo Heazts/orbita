@@ -173,5 +173,15 @@
 }
 
 article {
-  animation: fade-in-up 0.3s ease-out both;
+  animation: fade-in-up 0.35s ease-out both;
+  /* Newly mounted cards cascade in ~45ms apart (capped) so a batch of fresh
+     items reveals gradually-but-fast instead of popping in all at once. Only
+     new DOM nodes animate; existing cards keep their place on refresh. */
+  animation-delay: calc(min(var(--stagger, 0), 8) * 45ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  article {
+    animation: none;
+  }
 }

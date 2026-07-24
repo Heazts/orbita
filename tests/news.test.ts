@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { decodeEntities, inferCategory, normalize, plainText } from "@/lib/news"
+import { decodeEntities, inferCategory, normalize, plainText, truncate } from "@/lib/news"
 
 describe("decodeEntities", () => {
   it("decodes named, decimal and hex entities", () => {
@@ -30,6 +30,32 @@ describe("plainText", () => {
   it("unwraps double-encoded HTML in two passes (Agência Brasil case)", () => {
     // Feed puts escaped markup in the description: "&lt;p&gt;Texto&lt;/p&gt;".
     expect(plainText("&lt;p&gt;Texto importante&lt;/p&gt;")).toBe("Texto importante")
+  })
+})
+
+describe("truncate", () => {
+  it("returns the text unchanged when within the limit", () => {
+    expect(truncate("curto", 20)).toBe("curto")
+  })
+
+  it("cuts on a word boundary and appends an ellipsis", () => {
+    const original = "O Banco Central anunciou uma nova decisão importante hoje"
+    const result = truncate(original, 30)
+    expect(result.endsWith("…")).toBe(true)
+    // The kept text (without the ellipsis) is a whole-word prefix: the original
+    // continues with a space right after it, so no word was split.
+    const kept = result.slice(0, -1)
+    expect(original.startsWith(kept)).toBe(true)
+    expect(original[kept.length]).toBe(" ")
+    expect(result.length).toBeLessThanOrEqual(31)
+  })
+
+  it("strips trailing punctuation before the ellipsis", () => {
+    expect(truncate("Primeira frase completa aqui, e mais texto", 24)).not.toMatch(/[,\s]…$/)
+  })
+
+  it("hard-cuts a single very long token", () => {
+    expect(truncate("a".repeat(50), 10)).toBe(`${"a".repeat(10)}…`)
   })
 })
 
