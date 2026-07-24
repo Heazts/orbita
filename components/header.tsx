@@ -2,6 +2,7 @@
 
 import {
   Bookmark,
+  Gamepad2,
   Moon,
   RefreshCw,
   Search,
@@ -10,6 +11,7 @@ import {
   Sun,
   X,
 } from "lucide-react"
+import Link from "next/link"
 import { useRef } from "react"
 import { useSearchShortcut } from "@/hooks/use-search-shortcut"
 import { useTheme } from "@/hooks/use-theme"
@@ -73,6 +75,13 @@ export function Header({
               Ao vivo
             </span>
           )}
+          <Link
+            href="/jogos"
+            aria-label="Jogos"
+            className="flex size-9 items-center justify-center rounded-full border border-border bg-background text-foreground transition-all duration-150 hover:bg-muted hover:shadow-sm active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Gamepad2 className="size-4" />
+          </Link>
           <IconButton
             label={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
             onClick={toggleTheme}
