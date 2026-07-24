@@ -6,6 +6,7 @@ import { useHydratedState } from "@/hooks/use-hydrated-state"
 export function useSearchHistory(maxEntries = 6): {
   history: string[]
   addTerm: (term: string) => void
+  clearHistory: () => void
 } {
   const [history, setHistory] = useHydratedState<string[]>("orbita-history", [])
   const addTerm = useCallback(
@@ -26,5 +27,7 @@ export function useSearchHistory(maxEntries = 6): {
     [maxEntries, setHistory],
   )
 
-  return { history, addTerm }
+  const clearHistory = useCallback(() => setHistory([]), [setHistory])
+
+  return { history, addTerm, clearHistory }
 }
