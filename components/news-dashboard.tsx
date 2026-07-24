@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import useSWR from "swr"
 import { ArrowUp, Check, Clock3, RefreshCw, Search } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -7,10 +8,12 @@ import { useFavorites } from "@/hooks/use-favorites"
 import { useNow } from "@/hooks/use-now"
 import { useSearchHistory } from "@/hooks/use-search-history"
 import { useDebouncedQuery } from "@/hooks/use-debounced-query"
-import { FALLBACK_NEWS, type NewsCategory, type NewsItem, type NewsResponse } from "@/lib/news"
+import { usePreferences } from "@/hooks/use-preferences"
+import { FALLBACK_NEWS, isHeavyTopic, type NewsCategory, type NewsItem, type NewsResponse } from "@/lib/news"
 import { SkeletonCard } from "@/components/ui/skeleton-card"
 import { Header } from "@/components/header"
 import { Filters } from "@/components/filters"
+import { Preferences } from "@/components/preferences"
 import { CategoriesNav } from "@/components/categories-nav"
 import { NewsList } from "@/components/news-list"
 import { Sidebar } from "@/components/sidebar"
@@ -60,6 +63,7 @@ function buildApiUrl(query: string, category: NewsCategory, period: Period, sort
 
 export function NewsDashboard() {
   const now = useNow()
+  const { prefs } = usePreferences()
   const { favorites, favoritesCount, toggleFavorite } = useFavorites()
   const { history, addTerm } = useSearchHistory()
   const [input, setInput] = useState(() => {
@@ -71,6 +75,7 @@ export function NewsDashboard() {
   const [sort, setSort] = useState<Sort>("latest")
   const [source, setSource] = useState("Todas")
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [preferencesOpen, setPreferencesOpen] = useState(false)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [notice, setNotice] = useState("")
   const [showTop, setShowTop] = useState(false)
@@ -146,11 +151,23 @@ export function NewsDashboard() {
 
   const tickerItems = useMemo(() => (data?.items ?? []).slice(0, 12), [data?.items])
 
-  const items = favoritesOnly
-    ? Object.values(favorites).sort(
-        (a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt),
-      )
-    : data?.items ?? []
+  // "Equilibrado" hides heavy/pessimistic items while browsing (never while
+  // searching or in favorites, where intent is explicit). If that would empty
+  // the list, we keep the unfiltered items so the panel is never blank.
+  const items = useMemo(() => {
+    const base = favoritesOnly
+      ? Object.values(favorites).sort(
+          (a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt),
+        )
+      : data?.items ?? []
+    if (prefs.tone !== "balanced" || query || favoritesOnly) return base
+    const bright = base.filter((item) => !isHeavyTopic(item))
+    return bright.length > 0 ? bright : base
+  }, [prefs.tone, query, favoritesOnly, favorites, data?.items])
+
+  // Respect the "avisos de novas matérias" preference for both the pill and the
+  // header badge.
+  const visibleNewCount = prefs.newAlerts ? newCount : 0
 
   const share = useCallback(async (item: NewsItem) => {
     try {
@@ -187,9 +204,11 @@ export function NewsDashboard() {
         favoritesCount={favoritesCount}
         isValidating={isValidating}
         hasData={Boolean(data?.items?.length)}
-        newCount={newCount}
+        newCount={visibleNewCount}
         isLive={isLivePeriod}
         onRefresh={() => { setNewCount(0); void mutate() }}
+        preferencesOpen={preferencesOpen}
+        onPreferencesToggle={() => setPreferencesOpen((open) => !open)}
       />
       {!query && (
         <div className="mx-auto max-w-7xl px-5 pt-3 md:px-8">
@@ -223,6 +242,11 @@ export function NewsDashboard() {
           />
         </div>
       )}
+      {preferencesOpen && (
+        <div className="mx-auto max-w-7xl px-5 md:px-8">
+          <Preferences />
+        </div>
+      )}
 
       {tickerItems.length > 0 && <Ticker items={tickerItems} isLive={isLivePeriod} />}
 
@@ -235,7 +259,7 @@ export function NewsDashboard() {
       />
 
       <main id="conteudo" className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-6 md:px-8 md:py-8">
-        {newCount > 0 && !favoritesOnly && !query && (
+        {visibleNewCount > 0 && !favoritesOnly && !query && (
           // Passive announcement: the new items are already in the list (SWR
           // refreshes on an interval and the list renders the latest data), so
           // there is nothing to click — they cascade in on their own. The pill
@@ -246,7 +270,7 @@ export function NewsDashboard() {
             className="mx-auto flex items-center gap-2 rounded-full border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm font-bold text-destructive"
           >
             <span className="live-dot size-2 rounded-full bg-destructive" aria-hidden="true" />
-            {newCount} {newCount === 1 ? "nova matéria" : "novas matérias"}
+            {visibleNewCount} {visibleNewCount === 1 ? "nova matéria" : "novas matérias"}
           </div>
         )}
 
@@ -356,10 +380,61 @@ export function NewsDashboard() {
         )}
       </main>
 
-      <footer className="border-t">
-        <div className="mx-auto flex max-w-7xl flex-col justify-between gap-2 px-5 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center md:px-8 md:py-8">
-          <p className="font-medium">© {CURRENT_YEAR} Órbita Notícias</p>
-          <p>Feito com feeds RSS públicos e Google News</p>
+      <footer className="mt-4 border-t">
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 md:px-8 md:py-10">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-3">
+              <span className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-black text-primary-foreground">
+                O
+              </span>
+              <div>
+                <p className="font-serif text-sm font-bold text-foreground">Órbita</p>
+                <p className="text-xs text-muted-foreground">Notícias do mundo ao vivo</p>
+              </div>
+            </div>
+            <nav aria-label="Rodapé" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+              <Link
+                href="/jogos"
+                className="font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Jogos
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setPreferencesOpen(true)
+                  window.scrollTo({ top: 0, behavior: "smooth" })
+                }}
+                className="font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Preferências
+              </button>
+              <Link
+                href="/privacidade"
+                className="font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Privacidade
+              </Link>
+              <Link
+                href="/termos"
+                className="font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Termos
+              </Link>
+              <a
+                href="https://github.com/Heazts/orbita"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                GitHub
+              </a>
+            </nav>
+          </div>
+          <div className="flex flex-col justify-between gap-1 border-t pt-4 text-xs text-muted-foreground sm:flex-row sm:items-center">
+            <p className="font-medium">© {CURRENT_YEAR} Órbita Notícias</p>
+            <p>Feito com feeds RSS públicos e Google News</p>
+          </div>
         </div>
       </footer>
 

@@ -5,6 +5,7 @@ import {
   Moon,
   RefreshCw,
   Search,
+  Settings2,
   SlidersHorizontal,
   Sun,
   X,
@@ -27,6 +28,8 @@ type HeaderProps = {
   newCount: number
   isLive: boolean
   onRefresh: () => void
+  preferencesOpen: boolean
+  onPreferencesToggle: () => void
 }
 
 export function Header({
@@ -42,6 +45,8 @@ export function Header({
   newCount,
   isLive,
   onRefresh,
+  preferencesOpen,
+  onPreferencesToggle,
 }: HeaderProps) {
   const searchRef = useRef<HTMLInputElement>(null)
   const { theme, toggleTheme } = useTheme()
@@ -73,6 +78,13 @@ export function Header({
             onClick={toggleTheme}
           >
             {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+          </IconButton>
+          <IconButton
+            label="Preferências"
+            active={preferencesOpen}
+            onClick={onPreferencesToggle}
+          >
+            <Settings2 className="size-4" />
           </IconButton>
           <div className="relative">
             <IconButton

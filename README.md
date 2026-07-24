@@ -58,9 +58,12 @@ A interface é mobile-first com Tailwind (`sm:`/`md:`/`lg:`), testada em 320px, 
 
 ## Funcionalidades
 
-- Agrega fontes públicas de mundo (BBC Brasil, DW Brasil, Euronews), Brasil e política (Agência Brasil), tecnologia (Olhar Digital), ciência (NASA), esportes (GE), saúde (Agência Brasil Saúde), meio ambiente (WWF, G1 Natureza), entretenimento (G1 Pop & Arte), educação (G1 Educação, Agência Brasil Educação), cibersegurança e IA (The Hacker News, CISO Advisor) e boas notícias (Razões para Acreditar), com busca global via Google News.
+- Agrega fontes públicas de mundo (BBC Brasil, DW Brasil, Euronews), Brasil e política (Agência Brasil), tecnologia (Olhar Digital), ciência (NASA), esportes (GE), saúde (Agência Brasil Saúde), meio ambiente (WWF, G1 Natureza), entretenimento (G1 Pop & Arte), educação (G1 Educação, Agência Brasil Educação), cibersegurança e IA (The Hacker News) e boas notícias (Razões para Acreditar), com busca global via Google News.
 - Categorias: Mundo, Boas notícias, Política, Economia, Tecnologia, Cyber & IA, Ciência, Educação, Saúde, Esportes, Cultura, Entretenimento e Meio Ambiente, inferidas por palavra-chave a partir do título/descrição.
 - **Curadoria equilibrada na home**: a visão inicial (sem filtro) abre com um destaque leve e variado e mantém o topo diverso, sem começar por uma sequência de notícias pesadas — nada é escondido, só reordenado (`curateHomepage`). Ao pesquisar, filtrar ou entrar no modo ao vivo, a ordem cronológica/relevância é respeitada.
+- **Preferências (só no navegador)**: painel para escolher o *tom das notícias* (Equilibrado, que esconde notícias pesadas ao navegar, ou Completo), ligar/desligar os *avisos de novas matérias* e *reduzir animações*. Persistidas em `localStorage` (`hooks/use-preferences.ts`).
+- **Páginas de políticas**: `/privacidade` e `/termos` (estáticas, linkadas no rodapé), descrevendo honestamente que não há cadastro e que os dados ficam só no navegador.
+- **Jogos** (`/jogos`): uma pausa leve entre as notícias — **Termo** (adivinhe a palavra de 5 letras em 6 tentativas, com teclado físico e virtual) e **Sudoku** (grade 9×9 com destaque de conflitos ao vivo). A lógica dos jogos fica em `lib/games/` e é 100% testada (`tests/games/`).
 - Busca insensível a acentos (ex.: "eleicao" encontra "eleição") que sempre preserva os resultados do Google. Aceita deep link `?q=termo` (também alvo do `SearchAction` no JSON-LD), gerando URLs de busca compartilháveis.
 - Filtros por categoria, período, fonte e ordenação (mais recentes/mais relevantes); favoritos (com contador) e histórico de busca persistidos em `localStorage`.
 - Quando alguma fonte de feed está indisponível, um aviso discreto lista quais fontes falharam (o payload da API expõe `failedSources`), sem quebrar o restante do painel.
@@ -79,7 +82,7 @@ A interface é mobile-first com Tailwind (`sm:`/`md:`/`lg:`), testada em 320px, 
 - **Sem SSRF**: a rota `/api/news` só faz `fetch` para uma lista fixa de feeds (`FEED_SOURCES`) e para o domínio fixo `news.google.com`; a entrada do usuário (`q`) é sempre passada como parâmetro de URL codificado, nunca como host/URL arbitrário.
 - **Sem XSS via conteúdo externo**: título/descrição das notícias são renderizados como texto pelo React (nunca `dangerouslySetInnerHTML`), então HTML vindo dos feeds não é executado. Feeds que colocam o próprio HTML duplamente escapado na descrição (visto na prática na Agência Brasil) são desembrulhados com segurança por `plainText()`/`decodeEntities()` em `lib/news.ts` antes de virar texto.
 - **Imagens externas**: extraídas apenas de URLs `https://`; renderizadas com `<img>` simples (não `next/image`) de propósito — o otimizador de imagem do Next faria o próprio servidor buscar a URL externa arbitrária do feed, o que seria uma superfície de SSRF. `referrerPolicy="no-referrer"` evita vazar a origem do site para os hosts de imagem de terceiros.
-- **Dados do usuário**: favoritos, histórico de busca e tema ficam apenas em `localStorage` do navegador — nada é enviado a um servidor próprio.
+- **Dados do usuário**: favoritos, histórico de busca, tema e preferências ficam apenas em `localStorage` do navegador — nada é enviado a um servidor próprio. As páginas `/privacidade` e `/termos` descrevem isso para o usuário.
 
 ## Testes
 
