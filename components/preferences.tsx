@@ -1,8 +1,9 @@
 "use client"
 
-import { Check } from "lucide-react"
+import { Check, Monitor, Moon, Sun } from "lucide-react"
 import type { NewsTone } from "@/hooks/use-preferences"
 import { usePreferences } from "@/hooks/use-preferences"
+import type { ThemeMode } from "@/hooks/use-theme"
 
 function Toggle({
   label,
@@ -44,7 +45,18 @@ const TONE_OPTIONS: { value: NewsTone; label: string; hint: string }[] = [
   { value: "all", label: "Completo", hint: "Mostra tudo, sem filtro de tom" },
 ]
 
-export function Preferences() {
+const THEME_OPTIONS: { value: ThemeMode; label: string; Icon: typeof Sun }[] = [
+  { value: "light", label: "Claro", Icon: Sun },
+  { value: "dark", label: "Escuro", Icon: Moon },
+  { value: "system", label: "Sistema", Icon: Monitor },
+]
+
+type PreferencesProps = {
+  themeMode: ThemeMode
+  onThemeModeChange: (mode: ThemeMode) => void
+}
+
+export function Preferences({ themeMode, onThemeModeChange }: PreferencesProps) {
   const { prefs, setPreference } = usePreferences()
 
   return (
@@ -52,6 +64,35 @@ export function Preferences() {
       aria-label="Preferências"
       className="mt-3 flex flex-col gap-4 rounded-2xl border bg-card p-4 md:p-5"
     >
+      <div>
+        <p className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          Tema
+        </p>
+        <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Tema">
+          {THEME_OPTIONS.map((option) => {
+            const active = themeMode === option.value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => onThemeModeChange(option.value)}
+                className={`flex flex-col items-center gap-1.5 rounded-xl border p-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted/50"}`}
+              >
+                <option.Icon className="size-4" aria-hidden="true" />
+                <span className="text-xs font-bold">{option.label}</span>
+              </button>
+            )
+          })}
+        </div>
+        {themeMode === "system" && (
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            Acompanha automaticamente o tema do seu aparelho.
+          </p>
+        )}
+      </div>
+
       <div>
         <p className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
           Tom das notícias

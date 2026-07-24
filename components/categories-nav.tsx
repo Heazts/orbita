@@ -8,7 +8,7 @@ type CategoriesNavProps = {
 export function CategoriesNav({ category, onCategoryChange }: CategoriesNavProps) {
   return (
     <nav aria-label="Categorias" className="border-b">
-      <div className="mx-auto flex max-w-7xl overflow-x-auto px-5 md:px-8">
+      <div className="no-scrollbar mx-auto flex max-w-7xl overflow-x-auto px-5 md:px-8">
         {NEWS_CATEGORIES.map((item) => (
           <button
             key={item}
