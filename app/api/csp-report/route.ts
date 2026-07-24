@@ -25,9 +25,13 @@ type CspBody = {
 // Report fields are attacker-controlled, so strip control characters and cap
 // the length. Only printable ASCII (\x20-\x7e) survives — everything else is
 // replaced so the value is safe for structured logging (CodeQL js/log-injection).
+// The explicit CR/LF strip is redundant behaviourally (the printable filter
+// below also drops them) but the CodeQL js/log-injection sanitizer only
+// recognises literal \r/\n patterns, not negated character-class ranges.
 function sanitize(value: unknown, maxLength: number): string {
   if (typeof value !== "string") return "unknown"
-  const sanitized = value.replace(/[^\x20-\x7e]/g, "_").trim()
+  const noNewlines = value.replace(/[\r\n]/g, "")
+  const sanitized = noNewlines.replace(/[^\x20-\x7e]/g, "_").trim()
   return sanitized.length > maxLength ? sanitized.slice(0, maxLength) : sanitized || "unknown"
 }
 
