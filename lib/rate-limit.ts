@@ -38,6 +38,13 @@ export type RateLimitResult = {
 }
 
 export function checkRateLimit(clientId: string, now: number = Date.now()): RateLimitResult {
+  // clientIp() returns a fresh unknown-<uuid> per call when no IP header is
+  // present. Storing those keys would leak memory (each entry lives for the
+  // whole window but can never be revisited), so short-circuit here — the
+  // effective outcome is identical to a first-and-only hit.
+  if (clientId.startsWith("unknown-")) {
+    return { limited: false, remaining: RATE_LIMIT_MAX_REQUESTS - 1, retryAfterSeconds: 0 }
+  }
   const recent = (requestLog.get(clientId) ?? []).filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS)
   recent.push(now)
   requestLog.set(clientId, recent)

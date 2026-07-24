@@ -85,6 +85,18 @@ describe("checkRateLimit", () => {
     expect(result.retryAfterSeconds).toBeGreaterThan(0)
     expect(result.retryAfterSeconds).toBeLessThanOrEqual(60)
   })
+
+  it("does not accumulate memory for unknown-<uuid> keys", () => {
+    // Each call from a header-less client uses a fresh unique key; storing
+    // them would leak memory since they're never revisited.
+    const now = 6_500_000
+    for (let i = 0; i < 100; i += 1) {
+      const result = checkRateLimit(`unknown-${i}`, now)
+      expect(result.limited).toBe(false)
+    }
+    // resetRateLimit() in afterEach would mask the leak — check now:
+    expect(isRateLimited("unknown-fresh", now)).toBe(false)
+  })
 })
 
 describe("checkRateLimitDistributed", () => {

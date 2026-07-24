@@ -1,3 +1,6 @@
+"use client"
+
+import { useNow } from "@/hooks/use-now"
 import type { NewsItem } from "@/lib/news"
 
 type TickerProps = {
@@ -5,7 +8,8 @@ type TickerProps = {
   isLive: boolean
 }
 
-function relativeTime(publishedAt: string, now: number): string {
+function relativeTime(publishedAt: string, now: number | null): string {
+  if (now === null) return ""
   const diff = now - Date.parse(publishedAt)
   const minutes = Math.floor(diff / 60_000)
   if (minutes < 1) return "agora"
@@ -16,10 +20,14 @@ function relativeTime(publishedAt: string, now: number): string {
 }
 
 export function Ticker({ items, isLive }: TickerProps) {
-  const now = Date.now()
-  const recentItems = isLive
-    ? items.filter((item) => now - Date.parse(item.publishedAt) < 2 * 60 * 60_000)
-    : items
+  // Reading Date.now() during render is impure; useNow returns null pre-hydration
+  // and then a value that ticks on an interval — the relative timestamps stay fresh
+  // without producing SSR/CSR text mismatches.
+  const now = useNow()
+  const recentItems =
+    isLive && now !== null
+      ? items.filter((item) => now - Date.parse(item.publishedAt) < 2 * 60 * 60_000)
+      : items
 
   const displayItems = recentItems.length > 0 ? recentItems : items
 
