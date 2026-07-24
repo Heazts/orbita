@@ -54,9 +54,16 @@ const THEME_OPTIONS: { value: ThemeMode; label: string; Icon: typeof Sun }[] = [
 type PreferencesProps = {
   themeMode: ThemeMode
   onThemeModeChange: (mode: ThemeMode) => void
+  historyCount: number
+  onClearHistory: () => void
 }
 
-export function Preferences({ themeMode, onThemeModeChange }: PreferencesProps) {
+export function Preferences({
+  themeMode,
+  onThemeModeChange,
+  historyCount,
+  onClearHistory,
+}: PreferencesProps) {
   const { prefs, setPreference } = usePreferences()
 
   return (
@@ -135,6 +142,24 @@ export function Preferences({ themeMode, onThemeModeChange }: PreferencesProps) 
         checked={prefs.reduceMotion}
         onChange={(value) => setPreference("reduceMotion", value)}
       />
+
+      {historyCount > 0 && (
+        <div className="flex items-center justify-between gap-4 rounded-xl border bg-background p-3">
+          <span className="flex flex-col">
+            <span className="text-sm font-bold">Histórico de busca</span>
+            <span className="text-xs text-muted-foreground">
+              {historyCount} {historyCount === 1 ? "termo salvo" : "termos salvos"} neste navegador
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={onClearHistory}
+            className="shrink-0 rounded-full border border-destructive/30 px-3 py-1.5 text-xs font-bold text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Limpar
+          </button>
+        </div>
+      )}
 
       <p className="text-[11px] leading-relaxed text-muted-foreground">
         Suas preferências ficam salvas apenas neste navegador. Saiba mais na{" "}

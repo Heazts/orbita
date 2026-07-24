@@ -26,6 +26,18 @@ describe("useSearchHistory", () => {
     expect(JSON.parse(localStorage.getItem("orbita-history") ?? "[]")).toEqual(["eleição", "Economia"])
   })
 
+  it("clearHistory empties the list and the stored value", async () => {
+    const { result } = renderHook(() => useSearchHistory())
+    await waitFor(() => expect(result.current.history).toEqual([]))
+    act(() => result.current.addTerm("brasil"))
+    expect(result.current.history).toEqual(["brasil"])
+
+    act(() => result.current.clearHistory())
+
+    expect(result.current.history).toEqual([])
+    expect(JSON.parse(localStorage.getItem("orbita-history") ?? "null")).toEqual([])
+  })
+
   it("caps history at maxEntries, newest first", async () => {
     const { result } = renderHook(() => useSearchHistory(2))
     await waitFor(() => expect(result.current.history).toEqual([]))
