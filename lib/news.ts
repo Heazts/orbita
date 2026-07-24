@@ -1,10 +1,13 @@
 export const NEWS_CATEGORIES = [
   "Todas",
   "Mundo",
+  "Boas notícias",
   "Política",
   "Economia",
   "Tecnologia",
+  "Cyber & IA",
   "Ciência",
+  "Educação",
   "Saúde",
   "Esportes",
   "Cultura",
@@ -89,9 +92,39 @@ export const FEED_SOURCES: FeedSource[] = [
     category: "Meio Ambiente",
   },
   {
+    name: "G1 — Natureza",
+    url: "https://g1.globo.com/rss/g1/natureza/",
+    category: "Meio Ambiente",
+  },
+  {
     name: "G1 — Pop & Arte",
     url: "https://g1.globo.com/rss/g1/pop-arte/",
     category: "Entretenimento",
+  },
+  {
+    name: "G1 — Educação",
+    url: "https://g1.globo.com/rss/g1/educacao/",
+    category: "Educação",
+  },
+  {
+    name: "Agência Brasil — Educação",
+    url: "https://agenciabrasil.ebc.com.br/rss/educacao/feed.xml",
+    category: "Educação",
+  },
+  {
+    name: "The Hacker News",
+    url: "https://feeds.feedburner.com/TheHackersNews",
+    category: "Cyber & IA",
+  },
+  {
+    name: "CISO Advisor",
+    url: "https://www.cisoadvisor.com.br/feed/",
+    category: "Cyber & IA",
+  },
+  {
+    name: "Razões para Acreditar",
+    url: "https://razoesparaacreditar.com/feed/",
+    category: "Boas notícias",
   },
 ]
 
@@ -209,8 +242,12 @@ export function inferCategory(
 ): FeedSource["category"] {
   const normalized = normalize(title)
   const rules: Array<{ test: RegExp; category: FeedSource["category"] }> = [
+    // Cyber & AI runs first so a hacker/breach/AI story isn't swallowed by the
+    // broader "Tecnologia" rule below.
+    { test: /hacker|ransomware|malware|phishing|vazamento de dados|dados vazados|ciberataqu|cibernetic|cibersegur|seguranca digital|inteligencia artificial|chatgpt|openai|ia generativa|deepfake/, category: "Cyber & IA" },
+    { test: /enem|vestibular|faculdade|universidade|sisu|prouni|fies|bolsa de estudo|graduacao|mestrado|doutorado|estudante/, category: "Educação" },
     { test: /econom|mercado|inflacao|banco|juros|empresa|negocio/, category: "Economia" },
-    { test: /tecnolog|digital|internet|inteligencia artificial|software|celular/, category: "Tecnologia" },
+    { test: /tecnolog|digital|internet|software|celular|aplicativo/, category: "Tecnologia" },
     { test: /saude|vacina|hospital|doenca|medic|remedio|sus|virus|pandemia/, category: "Saúde" },
     { test: /futebol|copa|olimpi|campeonato|jogador|tecnico|placar|gol|esporte|atleta/, category: "Esportes" },
     { test: /ciencia|espaco|nasa|pesquisa|clima|estudo|astronomia/, category: "Ciência" },
@@ -219,4 +256,45 @@ export function inferCategory(
   ]
   const match = rules.find(({ test }) => test.test(normalized))
   return match?.category ?? fallback
+}
+
+// Topics that make a heavy/pessimistic lead. Used by curateHomepage to keep the
+// top of the default view balanced — these items are never hidden, just kept
+// out of the hero/first slots so opening the site doesn't feel like a wall of
+// tragedy. Matched against accent-stripped, lowercased text (see normalize).
+const HEAVY_TOPIC =
+  /morte|morto|mortos|assassin|homicidio|feminicidio|tragedia|tragic|massacre|chacina|estupro|guerra|bombardei|atentado|tiroteio|acidente|desastre|catastrofe|recessao|corrupcao|escandalo|violencia|sequestro|overdose|suicidio|golpe militar/
+
+export function isHeavyTopic(item: Pick<NewsItem, "title" | "description">): boolean {
+  return HEAVY_TOPIC.test(normalize(`${item.title} ${item.description}`))
+}
+
+// Reorders the default homepage feed so it opens balanced: a bright, varied
+// lead (with an image when possible), the first few slots kept light and
+// category-diverse, and no two same-category items back to back when avoidable.
+// Nothing is dropped — heavy news still appears, just not as the first thing a
+// reader sees. Only applied to the unfiltered "latest" view; search, category,
+// period and live modes keep their exact chronological/relevance order.
+export function curateHomepage(items: NewsItem[]): NewsItem[] {
+  if (items.length <= 3) return items
+  // Lead: freshest bright item, preferring one with an image for the hero card.
+  let leadIndex = items.findIndex((item) => !isHeavyTopic(item) && item.image)
+  if (leadIndex === -1) leadIndex = items.findIndex((item) => !isHeavyTopic(item))
+  if (leadIndex === -1) leadIndex = 0
+
+  const pool = items.filter((_, index) => index !== leadIndex)
+  const result: NewsItem[] = [items[leadIndex]]
+  const BRIGHT_TOP = 4 // keep roughly the first screenful light
+
+  while (pool.length > 0) {
+    const prevCategory = result[result.length - 1].category
+    const wantBright = result.length < BRIGHT_TOP
+    let index = pool.findIndex((item) => item.category !== prevCategory && (!wantBright || !isHeavyTopic(item)))
+    if (index === -1) index = pool.findIndex((item) => !wantBright || !isHeavyTopic(item))
+    if (index === -1) index = pool.findIndex((item) => item.category !== prevCategory)
+    if (index === -1) index = 0
+    result.push(pool[index])
+    pool.splice(index, 1)
+  }
+  return result
 }
