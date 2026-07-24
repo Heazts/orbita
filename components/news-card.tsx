@@ -70,6 +70,9 @@ type NewsCardProps = {
 
 export function NewsCard({ item, now, query, favorite, onFavorite, onShare, lead = false }: NewsCardProps) {
   const itemIsNew = isNew(item.publishedAt, now)
+  // Empty for undated items (publishedAt === "") or before hydration; when empty
+  // we drop the time and its separator so no dangling "·" is left behind.
+  const time = relativeTime(item.publishedAt, now)
 
   const content = (
     <>
@@ -82,13 +85,14 @@ export function NewsCard({ item, now, query, favorite, onFavorite, onShare, lead
         <span className={lead ? "opacity-80" : "opacity-60"}>{item.category}</span>
         <span className={lead ? "opacity-40" : "opacity-30"} aria-hidden="true">·</span>
         <span className={lead ? "opacity-80" : "opacity-60"}>{item.source}</span>
-        <span className={lead ? "opacity-40" : "opacity-30"} aria-hidden="true">·</span>
-        <time
-          dateTime={item.publishedAt}
-          className={lead ? "opacity-80" : "opacity-60"}
-        >
-          {relativeTime(item.publishedAt, now)}
-        </time>
+        {time && (
+          <>
+            <span className={lead ? "opacity-40" : "opacity-30"} aria-hidden="true">·</span>
+            <time dateTime={item.publishedAt} className={lead ? "opacity-80" : "opacity-60"}>
+              {time}
+            </time>
+          </>
+        )}
       </div>
       <h2
         className={`text-balance font-serif font-bold leading-tight ${lead ? "text-2xl md:text-4xl lg:text-5xl" : "text-lg md:text-xl"}`}

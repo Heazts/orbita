@@ -118,7 +118,13 @@ export async function GET(request: NextRequest) {
   // Score and parse each item once, then filter/sort on the precomputed values
   // instead of recomputing relevance() inside the sort comparator.
   const unique = Array.from(new Map(combined.map((item) => [item.url, item])).values())
-    .map((item) => ({ item, score: query ? relevance(item, terms) : 0, time: Date.parse(item.publishedAt) }))
+    .map((item) => {
+      // Undated items (publishedAt === "") parse to NaN; map that to -Infinity so
+      // they sort last under "mais recentes" and never satisfy the live/period
+      // cutoff (an unknown date can't be claimed to be within the last 2h/24h).
+      const parsed = Date.parse(item.publishedAt)
+      return { item, score: query ? relevance(item, terms) : 0, time: Number.isNaN(parsed) ? -Infinity : parsed }
+    })
     .filter(({ item, score }) => !query || googleUrls.has(item.url) || score > 0)
     .filter(({ item }) => category === "Todas" || item.category === category)
     .filter(({ item }) => source === "Todas" || item.source === source)
