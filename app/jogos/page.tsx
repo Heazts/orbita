@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Grid3x3, WholeWord } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Jogos",
@@ -13,13 +13,13 @@ const GAMES = [
     href: "/jogos/termo",
     name: "Termo",
     description: "Descubra a palavra de 5 letras em 6 tentativas.",
-    emoji: "🟩",
+    Icon: WholeWord,
   },
   {
     href: "/jogos/sudoku",
     name: "Sudoku",
     description: "Complete a grade 9×9 sem repetir números.",
-    emoji: "🔢",
+    Icon: Grid3x3,
   },
 ]
 
@@ -47,8 +47,11 @@ export default function JogosPage() {
               href={game.href}
               className="group rounded-2xl border bg-card p-6 transition-colors hover:border-primary hover:bg-muted/40"
             >
-              <div className="text-3xl" aria-hidden="true">
-                {game.emoji}
+              <div
+                className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground"
+                aria-hidden="true"
+              >
+                <game.Icon className="size-6" />
               </div>
               <h2 className="mt-3 font-serif text-xl font-bold">{game.name}</h2>
               <p className="mt-1 text-sm text-muted-foreground">{game.description}</p>
