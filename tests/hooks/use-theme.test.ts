@@ -111,4 +111,37 @@ describe("useTheme", () => {
     expect(result.current.theme).toBe("light")
     expect(document.documentElement.classList.contains("light")).toBe(true)
   })
+
+  it("updates the theme-color metas so the browser UI matches the chosen theme", async () => {
+    stubMatchMedia(false)
+    const meta = document.createElement("meta")
+    meta.setAttribute("name", "theme-color")
+    meta.setAttribute("media", "(prefers-color-scheme: light)")
+    document.head.appendChild(meta)
+
+    const { result } = renderHook(() => useTheme())
+    act(() => result.current.setMode("dark"))
+    expect(meta.getAttribute("content")).toBe("#0a0a0a")
+
+    act(() => result.current.setMode("light"))
+    expect(meta.getAttribute("content")).toBe("#f7f6f2")
+
+    meta.remove()
+  })
+
+  it("suppresses transitions during the switch and releases afterwards", async () => {
+    vi.useFakeTimers()
+    try {
+      stubMatchMedia(false)
+      const { result } = renderHook(() => useTheme())
+      act(() => result.current.setMode("dark"))
+      // The switch happens with transitions frozen…
+      expect(document.documentElement.classList.contains("theme-switching")).toBe(true)
+      // …and the freeze lifts shortly after the flip.
+      act(() => vi.advanceTimersByTime(250))
+      expect(document.documentElement.classList.contains("theme-switching")).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
