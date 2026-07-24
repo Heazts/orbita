@@ -113,6 +113,18 @@
   a {
     -webkit-tap-highlight-color: transparent;
   }
+  ::selection {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+}
+
+/* Horizontal chip/tab rows scroll without showing a scrollbar. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 /* Live indicator pulse */

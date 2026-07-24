@@ -1,27 +1,82 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { writeStore } from "@/lib/storage"
 
 export type Theme = "light" | "dark"
+// What the user chose: an explicit theme, or "system" to follow the OS/browser
+// preference (including live changes while the page is open).
+export type ThemeMode = Theme | "system"
 
+const STORAGE_KEY = "orbita-theme"
+
+function systemPrefersDark(): boolean {
+  return typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches
+}
+
+function resolve(mode: ThemeMode): Theme {
+  if (mode === "system") return systemPrefersDark() ? "dark" : "light"
+  return mode
+}
+
+function applyClass(theme: Theme): void {
+  document.documentElement.classList.remove("light", "dark")
+  document.documentElement.classList.add(theme)
+}
+
+// The boot script in app/layout.tsx applies the right class before hydration;
+// reading it back keeps the first client render consistent with the DOM.
 function getInitialTheme(): Theme {
   if (typeof document === "undefined") return "light"
   return document.documentElement.classList.contains("dark") ? "dark" : "light"
 }
 
-export function useTheme(): { theme: Theme; toggleTheme: () => void } {
-  const [theme, setTheme] = useState<Theme>(getInitialTheme)
+function getInitialMode(): ThemeMode {
+  if (typeof window === "undefined") return "system"
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored === "light" || stored === "dark" || stored === "system") return stored
+  } catch {
+    // Private mode — fall through to "system".
+  }
+  return "system"
+}
 
-  const toggleTheme = useCallback(() => {
-    setTheme((current) => {
-      const next: Theme = current === "dark" ? "light" : "dark"
-      document.documentElement.classList.remove("light", "dark")
-      document.documentElement.classList.add(next)
-      writeStore("orbita-theme", next)
-      return next
-    })
+export function useTheme(): {
+  theme: Theme
+  mode: ThemeMode
+  setMode: (mode: ThemeMode) => void
+  toggleTheme: () => void
+} {
+  const [theme, setTheme] = useState<Theme>(getInitialTheme)
+  const [mode, setModeState] = useState<ThemeMode>(getInitialMode)
+
+  const setMode = useCallback((next: ThemeMode) => {
+    setModeState(next)
+    const resolved = resolve(next)
+    applyClass(resolved)
+    setTheme(resolved)
+    writeStore(STORAGE_KEY, next)
   }, [])
 
-  return { theme, toggleTheme }
+  // In system mode, follow OS/browser theme changes live.
+  useEffect(() => {
+    if (mode !== "system") return
+    const query = window.matchMedia("(prefers-color-scheme: dark)")
+    const onChange = () => {
+      const resolved: Theme = query.matches ? "dark" : "light"
+      applyClass(resolved)
+      setTheme(resolved)
+    }
+    query.addEventListener("change", onChange)
+    return () => query.removeEventListener("change", onChange)
+  }, [mode])
+
+  // The header button stays a quick one-tap switch: it always sets an explicit
+  // theme (overriding "system"), which is what a tap on a sun/moon icon means.
+  const toggleTheme = useCallback(() => {
+    setMode(theme === "dark" ? "light" : "dark")
+  }, [theme, setMode])
+
+  return { theme, mode, setMode, toggleTheme }
 }

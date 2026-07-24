@@ -9,6 +9,7 @@ import { useNow } from "@/hooks/use-now"
 import { useSearchHistory } from "@/hooks/use-search-history"
 import { useDebouncedQuery } from "@/hooks/use-debounced-query"
 import { usePreferences } from "@/hooks/use-preferences"
+import { useTheme } from "@/hooks/use-theme"
 import { FALLBACK_NEWS, isHeavyTopic, type NewsCategory, type NewsItem, type NewsResponse } from "@/lib/news"
 import { SkeletonCard } from "@/components/ui/skeleton-card"
 import { Header } from "@/components/header"
@@ -64,6 +65,9 @@ function buildApiUrl(query: string, category: NewsCategory, period: Period, sort
 export function NewsDashboard() {
   const now = useNow()
   const { prefs } = usePreferences()
+  // Single theme instance shared by the header toggle and the preferences
+  // panel, so both always show the same state.
+  const { theme, mode: themeMode, setMode: setThemeMode, toggleTheme } = useTheme()
   const { favorites, favoritesCount, toggleFavorite } = useFavorites()
   const { history, addTerm } = useSearchHistory()
   const [input, setInput] = useState(() => {
@@ -209,10 +213,12 @@ export function NewsDashboard() {
         onRefresh={() => { setNewCount(0); void mutate() }}
         preferencesOpen={preferencesOpen}
         onPreferencesToggle={() => setPreferencesOpen((open) => !open)}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
       {!query && (
         <div className="mx-auto max-w-7xl px-5 pt-3 md:px-8">
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
             {[...history, ...SUGGESTIONS]
               .filter((term, index, all) => all.indexOf(term) === index)
               .slice(0, 8)
@@ -244,7 +250,7 @@ export function NewsDashboard() {
       )}
       {preferencesOpen && (
         <div className="mx-auto max-w-7xl px-5 md:px-8">
-          <Preferences />
+          <Preferences themeMode={themeMode} onThemeModeChange={setThemeMode} />
         </div>
       )}
 

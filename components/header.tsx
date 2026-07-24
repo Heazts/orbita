@@ -14,7 +14,7 @@ import {
 import Link from "next/link"
 import { useRef } from "react"
 import { useSearchShortcut } from "@/hooks/use-search-shortcut"
-import { useTheme } from "@/hooks/use-theme"
+import type { Theme } from "@/hooks/use-theme"
 import { IconButton } from "@/components/ui/icon-button"
 
 type HeaderProps = {
@@ -32,6 +32,10 @@ type HeaderProps = {
   onRefresh: () => void
   preferencesOpen: boolean
   onPreferencesToggle: () => void
+  // Theme state lives in the dashboard (single useTheme instance) so the
+  // header toggle and the preferences panel stay in sync.
+  theme: Theme
+  onToggleTheme: () => void
 }
 
 export function Header({
@@ -49,9 +53,10 @@ export function Header({
   onRefresh,
   preferencesOpen,
   onPreferencesToggle,
+  theme,
+  onToggleTheme,
 }: HeaderProps) {
   const searchRef = useRef<HTMLInputElement>(null)
-  const { theme, toggleTheme } = useTheme()
   useSearchShortcut(searchRef)
 
   const showLiveIndicator = isLive && hasData
@@ -84,7 +89,7 @@ export function Header({
           </Link>
           <IconButton
             label={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
-            onClick={toggleTheme}
+            onClick={onToggleTheme}
           >
             {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </IconButton>
