@@ -40,6 +40,11 @@ describe("plainText", () => {
     // Feed puts escaped markup in the description: "&lt;p&gt;Texto&lt;/p&gt;".
     expect(plainText("&lt;p&gt;Texto importante&lt;/p&gt;")).toBe("Texto importante")
   })
+
+  it("strips a leaked \"[object Object]\" artifact from feed text (Globo/GE case)", () => {
+    expect(plainText("[object Object]Carpini, em coletiva")).toBe("Carpini, em coletiva")
+    expect(plainText("Antes [object Object] depois")).toBe("Antes depois")
+  })
 })
 
 describe("truncate", () => {

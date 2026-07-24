@@ -117,11 +117,6 @@ export const FEED_SOURCES: FeedSource[] = [
     category: "Cyber & IA",
   },
   {
-    name: "CISO Advisor",
-    url: "https://www.cisoadvisor.com.br/feed/",
-    category: "Cyber & IA",
-  },
-  {
     name: "Razões para Acreditar",
     url: "https://razoesparaacreditar.com/feed/",
     category: "Boas notícias",
@@ -216,7 +211,13 @@ export function plainText(value: unknown): string {
   for (let pass = 0; pass < 2; pass += 1) {
     text = decodeEntities(text).replace(/<[^>]*>/g, " ")
   }
-  return text.replace(/\s+/g, " ").trim()
+  // Some publishers (seen in Globo/GE descriptions) leak a JavaScript object
+  // straight into the feed, so the text literally contains "[object Object]".
+  // It's never real content — strip it regardless of which feed it came from.
+  return text
+    .replace(/\[object Object\]/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
 }
 
 // Lowercase and strip diacritics so "eleicao" matches "eleição" in search.

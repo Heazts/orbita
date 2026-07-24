@@ -160,6 +160,21 @@
   .live-badge { animation: none; }
 }
 
+/* Manual "Reduzir animações" preference (usePreferences → <html class>). Mirrors
+   prefers-reduced-motion: neutralizes every animation and transition. */
+.reduce-motion .ticker { overflow-x: auto; }
+.reduce-motion .ticker-track { animation: none; }
+.reduce-motion .live-dot { animation: none; opacity: 1; }
+.reduce-motion .live-badge { animation: none; }
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
 /* Fade-in for cards */
 @keyframes fade-in-up {
   from {
