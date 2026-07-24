@@ -1,30 +1,49 @@
 "use client"
 
-import { Eraser, RotateCcw } from "lucide-react"
+import { Eraser, RotateCcw, Timer, Trophy } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
+  DIFFICULTIES,
   SIZE,
   colOf,
   findConflicts,
   generatePuzzle,
+  holesFor,
   isSolved,
   rowOf,
+  type Difficulty,
   type Grid,
   type Puzzle,
 } from "@/lib/games/sudoku"
+import { useHydratedState } from "@/hooks/use-hydrated-state"
 
-const HOLES = 45
+// Best completion time (in seconds) per difficulty, kept in the browser only.
+type BestTimes = Partial<Record<Difficulty, number>>
+
+function formatTime(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+}
 
 export function SudokuGame() {
+  const [difficulty, setDifficulty] = useState<Difficulty>("medio")
   const [puzzle, setPuzzle] = useState<Puzzle | null>(null)
   const [grid, setGrid] = useState<Grid>([])
   const [selected, setSelected] = useState<number | null>(null)
+  const [elapsed, setElapsed] = useState(0)
+  const [bestTimes, setBestTimes] = useHydratedState<BestTimes>("orbita-sudoku-best", {})
+  // Guards so a solved board is only recorded once per game.
+  const recordedRef = useRef(false)
 
-  const newGame = useCallback(() => {
-    const generated = generatePuzzle(Math.floor(Math.random() * 1_000_000_000), HOLES)
+  const newGame = useCallback((level: Difficulty) => {
+    const generated = generatePuzzle(Math.floor(Math.random() * 1_000_000_000), holesFor(level))
+    setDifficulty(level)
     setPuzzle(generated)
     setGrid([...generated.puzzle])
     setSelected(null)
+    setElapsed(0)
+    recordedRef.current = false
   }, [])
 
   // Generate the first puzzle on the client only (random seed), exactly once.
@@ -32,7 +51,7 @@ export function SudokuGame() {
   useEffect(() => {
     if (started.current) return
     started.current = true
-    newGame()
+    newGame("medio")
   }, [newGame])
 
   const conflicts = useMemo(() => (grid.length ? findConflicts(grid) : new Set<number>()), [grid])
@@ -41,6 +60,25 @@ export function SudokuGame() {
     [grid, puzzle],
   )
   const remaining = useMemo(() => grid.filter((v) => v === 0).length, [grid])
+
+  // The clock ticks while a puzzle is active and stops on solve.
+  useEffect(() => {
+    if (!puzzle || solved) return
+    const id = window.setInterval(() => setElapsed((seconds) => seconds + 1), 1_000)
+    return () => window.clearInterval(id)
+  }, [puzzle, solved])
+
+  // Record the best time once per solved game.
+  useEffect(() => {
+    if (!solved || recordedRef.current) return
+    recordedRef.current = true
+    setBestTimes((prev) => {
+      const previousBest = prev[difficulty]
+      return previousBest === undefined || elapsed < previousBest
+        ? { ...prev, [difficulty]: elapsed }
+        : prev
+    })
+  }, [solved, elapsed, difficulty, setBestTimes])
 
   const setValue = useCallback(
     (value: number) => {
@@ -73,9 +111,38 @@ export function SudokuGame() {
   const selRow = selected === null ? -1 : rowOf(selected)
   const selCol = selected === null ? -1 : colOf(selected)
   const selValue = selected === null ? 0 : grid[selected]
+  const best = bestTimes[difficulty]
 
   return (
     <div className="flex flex-col items-center gap-5">
+      <div className="flex rounded-full border p-1" role="tablist" aria-label="Dificuldade">
+        {DIFFICULTIES.map((level) => (
+          <button
+            key={level.id}
+            type="button"
+            role="tab"
+            aria-selected={difficulty === level.id}
+            onClick={() => newGame(level.id)}
+            className={`rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${difficulty === level.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            {level.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-4 text-xs font-medium text-muted-foreground">
+        <span className="flex items-center gap-1.5 tabular-nums">
+          <Timer className="size-3.5" aria-hidden="true" />
+          {formatTime(elapsed)}
+        </span>
+        {best !== undefined && (
+          <span className="flex items-center gap-1.5 tabular-nums">
+            <Trophy className="size-3.5" aria-hidden="true" />
+            Melhor: {formatTime(best)}
+          </span>
+        )}
+      </div>
+
       <div className="grid grid-cols-9 overflow-hidden rounded-lg border-2 border-foreground/60">
         {grid.map((value, index) => {
           const given = puzzle?.givens[index]
@@ -108,7 +175,7 @@ export function SudokuGame() {
 
       <p aria-live="polite" className="min-h-5 text-sm font-medium">
         {solved ? (
-          <span className="text-emerald-600">Resolvido! 🎉</span>
+          <span className="text-emerald-600">Resolvido em {formatTime(elapsed)}! 🎉</span>
         ) : (
           <span className="text-muted-foreground">{remaining} células restantes</span>
         )}
@@ -139,7 +206,7 @@ export function SudokuGame() {
 
       <button
         type="button"
-        onClick={newGame}
+        onClick={() => newGame(difficulty)}
         className="flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-bold transition-colors hover:bg-muted"
       >
         <RotateCcw className="size-4" aria-hidden="true" />
