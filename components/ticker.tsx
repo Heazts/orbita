@@ -10,7 +10,9 @@ type TickerProps = {
 
 function relativeTime(publishedAt: string, now: number | null): string {
   if (now === null) return ""
-  const diff = now - Date.parse(publishedAt)
+  const parsed = Date.parse(publishedAt)
+  if (Number.isNaN(parsed)) return ""
+  const diff = now - parsed
   const minutes = Math.floor(diff / 60_000)
   if (minutes < 1) return "agora"
   if (minutes < 60) return `${minutes}min`

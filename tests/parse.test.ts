@@ -134,6 +134,25 @@ describe("parseFeed", () => {
     expect(items[0].title).toBe("Manchete importante")
     expect(items[0].source).toBe("Veículo X")
   })
+
+  it("emits an empty publishedAt for items without a parseable date", () => {
+    // Undated items must not masquerade as fresh (would pollute "ao vivo",
+    // the "Novo" badge and latest-sort). "" signals "unknown time" downstream.
+    const noDate = `<?xml version="1.0"?>
+<rss version="2.0"><channel><item>
+  <title>Sem data</title>
+  <link>https://example.com/sem-data</link>
+</item></channel></rss>`
+    const items = parseFeed(noDate, SOURCE)
+    expect(items).toHaveLength(1)
+    expect(items[0].publishedAt).toBe("")
+  })
+
+  it("keeps a valid publishedAt when the feed provides one", () => {
+    const items = parseFeed(RSS, SOURCE)
+    expect(items[0].publishedAt).not.toBe("")
+    expect(Number.isNaN(Date.parse(items[0].publishedAt))).toBe(false)
+  })
 })
 
 describe("relevance", () => {

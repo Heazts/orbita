@@ -137,9 +137,12 @@ export function parseFeed(xml: string, source: FeedSource, isGoogle = false): Ne
         image: findImage(item),
         source: googleSource || source.name,
         category: inferCategory(`${title} ${description}`, source.category),
-        publishedAt: Number.isNaN(date.getTime())
-          ? new Date().toISOString()
-          : date.toISOString(),
+        // Empty string when the feed gives no parseable date. Fabricating
+        // new Date() here would make undated items masquerade as fresh: they'd
+        // always pass the "ao vivo" 2h cutoff, always show the "Novo" badge, and
+        // sort above genuinely recent news. Consumers treat "" as "unknown time"
+        // (sorts last, never counts as live/new) instead.
+        publishedAt: Number.isNaN(date.getTime()) ? "" : date.toISOString(),
       }
     })
     .filter((item): item is NewsItem => Boolean(item))
