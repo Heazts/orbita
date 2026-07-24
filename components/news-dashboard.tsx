@@ -393,6 +393,12 @@ export function NewsDashboard() {
               </div>
             </div>
             <nav aria-label="Rodapé" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+              <Link
+                href="/jogos"
+                className="font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Jogos
+              </Link>
               <button
                 type="button"
                 onClick={() => {
