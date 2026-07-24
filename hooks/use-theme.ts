@@ -19,9 +19,29 @@ function resolve(mode: ThemeMode): Theme {
   return mode
 }
 
+// Background colors mirrored from the themeColor entries in app/layout.tsx.
+const THEME_COLOR: Record<Theme, string> = {
+  light: "#f7f6f2",
+  dark: "#0a0a0a",
+}
+
 function applyClass(theme: Theme): void {
-  document.documentElement.classList.remove("light", "dark")
-  document.documentElement.classList.add(theme)
+  const root = document.documentElement
+  // Suppress CSS transitions while the theme flips: many surfaces have
+  // `transition-colors` (~150ms) while others change instantly, so without
+  // this the page shows mixed old/new colors for a moment (see globals.css
+  // `.theme-switching`). Removed shortly after, past the longest transition.
+  root.classList.add("theme-switching")
+  root.classList.remove("light", "dark")
+  root.classList.add(theme)
+  // Keep the browser UI (mobile address bar / status bar) on the chosen theme.
+  // The server renders media-scoped theme-color metas that follow the OS; once
+  // the user picks a theme, both metas get the resolved color so whichever the
+  // browser matches agrees with the page.
+  for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
+    meta.setAttribute("content", THEME_COLOR[theme])
+  }
+  window.setTimeout(() => root.classList.remove("theme-switching"), 200)
 }
 
 // The boot script in app/layout.tsx applies the right class before hydration;

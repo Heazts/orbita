@@ -127,6 +127,15 @@
   display: none;
 }
 
+/* Applied by use-theme for a moment while switching themes: freezes every CSS
+   transition so all surfaces flip color in the same frame instead of some
+   lagging ~150ms behind (mixed light/dark colors mid-switch). */
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
+}
+
 /* Live indicator pulse */
 .live-dot {
   animation: live-pulse 2s ease-in-out infinite;
