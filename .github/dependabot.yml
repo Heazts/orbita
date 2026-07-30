@@ -1,37 +1,13 @@
 version: 2
 updates:
-  - package-ecosystem: npm
-    directory: /
+  - package-ecosystem: "npm"
+    directory: "/"
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
-    groups:
-      production-dependencies:
-        dependency-type: production
-      development-dependencies:
-        dependency-type: development
-    labels:
-      - dependencies
-    ignore:
-      # Major bumps of the lint/type toolchain break each other and Next's
-      # ESLint config (eslint 10 + typescript 7 are not yet supported by
-      # @typescript-eslint / eslint-config-next). Allow minor/patch only.
-      - dependency-name: eslint
-        update-types: [version-update:semver-major]
-      - dependency-name: typescript
-        update-types: [version-update:semver-major]
-      - dependency-name: "@types/node"
-        update-types: [version-update:semver-major]
-      # React types must track the React major we run.
-      - dependency-name: "@types/react"
-        update-types: [version-update:semver-major]
-      - dependency-name: "@types/react-dom"
-        update-types: [version-update:semver-major]
+      interval: "weekly"
+    open-pull-requests-limit: 10
 
-  - package-ecosystem: github-actions
-    directory: /
+  - package-ecosystem: "github-actions"
+    directory: "/"
     schedule:
-      interval: weekly
-    labels:
-      - dependencies
-      - github-actions
+      interval: "weekly"
+    open-pull-requests-limit: 5

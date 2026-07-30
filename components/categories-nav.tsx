@@ -15,7 +15,7 @@ export function CategoriesNav({ category, onCategoryChange }: CategoriesNavProps
             type="button"
             onClick={() => onCategoryChange(item)}
             aria-pressed={category === item}
-            className="shrink-0 border-b-2 border-transparent px-4 py-4 text-xs font-bold uppercase tracking-widest text-muted-foreground aria-pressed:border-primary aria-pressed:text-foreground"
+            className="shrink-0 border-b-2 border-transparent px-4 py-4 text-xs font-bold uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-pressed:border-primary aria-pressed:text-foreground"
           >
             {item}
           </button>

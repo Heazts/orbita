@@ -91,7 +91,7 @@ const RSS = `<?xml version="1.0"?>
     <item>
       <title>Notícia com imagem</title>
       <link>https://example.com/1</link>
-      <description>&lt;p&gt;Resumo da matéria&lt;/p&gt;</description>
+      <description>&lt;p&gt;Resumo da matéria.&lt;/p&gt;</description>
       <pubDate>Tue, 01 Jul 2025 12:00:00 GMT</pubDate>
       <media:content url="https://cdn.site.com/foto.jpg" />
     </item>
@@ -133,7 +133,7 @@ describe("parseFeed", () => {
     // id is the url itself: items are already deduplicated by url downstream,
     // so this is a collision-free identifier without needing a hash.
     expect(items[0].id).toBe("https://example.com/1")
-    expect(items[0].description).toBe("Resumo da matéria")
+    expect(items[0].description).toBe("Resumo da matéria.")
     expect(items[0].image).toBe("https://cdn.site.com/foto.jpg")
     expect(items[0].source).toBe("Fonte Teste")
     expect(new Date(items[0].publishedAt).getUTCFullYear()).toBe(2025)

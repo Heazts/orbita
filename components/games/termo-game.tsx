@@ -170,11 +170,14 @@ export function TermoGame() {
 
   return (
     <div className="flex flex-col items-center gap-5">
+      {/* Tab list for game mode selection */}
       <div className="flex rounded-full border p-1" role="tablist" aria-label="Modo de jogo">
         <button
           type="button"
           role="tab"
+          id="tab-daily"
           aria-selected={mode === "daily"}
+          aria-controls="panel-termo"
           onClick={startDaily}
           className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${mode === "daily" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
         >
@@ -184,7 +187,9 @@ export function TermoGame() {
         <button
           type="button"
           role="tab"
+          id="tab-free"
           aria-selected={mode === "free"}
+          aria-controls="panel-termo"
           onClick={startFree}
           className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${mode === "free" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
         >
@@ -193,116 +198,125 @@ export function TermoGame() {
         </button>
       </div>
 
-      <div className="grid gap-1.5" role="grid" aria-label="Tabuleiro do Termo">
-        {Array.from({ length: MAX_ATTEMPTS }).map((_, row) => {
-          const attempt = attempts[row]
-          const isCurrentRow = row === attempts.length && !finished
-          return (
-            <div key={row} className="flex gap-1.5" role="row">
-              {Array.from({ length: WORD_LENGTH }).map((_, col) => {
-                const letter = attempt ? attempt.guess[col] : isCurrentRow ? current[col] ?? "" : ""
-                const result = attempt?.results[col]
-                const filledCurrent = isCurrentRow && Boolean(current[col])
-                return (
-                  <div
-                    key={col}
-                    role="gridcell"
-                    className={`flex size-13 items-center justify-center rounded-md border-2 text-2xl font-bold uppercase transition-colors sm:size-14 ${
-                      result
-                        ? TILE_STYLES[result]
-                        : filledCurrent
-                          ? "border-foreground/40 bg-background"
-                          : "border-border bg-background"
-                    }`}
-                  >
-                    {letter}
-                  </div>
-                )
-              })}
-            </div>
-          )
-        })}
-      </div>
+      {/* Tab panel — wraps the entire game area */}
+      <div
+        id="panel-termo"
+        role="tabpanel"
+        aria-labelledby={mode === "daily" ? "tab-daily" : "tab-free"}
+        className="flex flex-col items-center gap-5"
+      >
+        <div className="grid gap-1.5" role="grid" aria-label="Tabuleiro do Termo">
+          {Array.from({ length: MAX_ATTEMPTS }).map((_, row) => {
+            const attempt = attempts[row]
+            const isCurrentRow = row === attempts.length && !finished
+            return (
+              <div key={row} className="flex gap-1.5" role="row">
+                {Array.from({ length: WORD_LENGTH }).map((_, col) => {
+                  const letter = attempt ? attempt.guess[col] : isCurrentRow ? current[col] ?? "" : ""
+                  const result = attempt?.results[col]
+                  const filledCurrent = isCurrentRow && Boolean(current[col])
+                  return (
+                    <div
+                      key={col}
+                      role="gridcell"
+                      className={`flex size-13 items-center justify-center rounded-md border-2 text-2xl font-bold uppercase transition-colors sm:size-14 ${
+                        result
+                          ? TILE_STYLES[result]
+                          : filledCurrent
+                            ? "border-foreground/40 bg-background"
+                            : "border-border bg-background"
+                      }`}
+                    >
+                      {letter}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
 
-      <p aria-live="polite" className="min-h-5 text-sm font-medium text-muted-foreground">
-        {statusText}
-      </p>
+        <p aria-live="polite" className="min-h-5 text-sm font-medium text-muted-foreground">
+          {statusText}
+        </p>
 
-      {finished && (
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <button
-            type="button"
-            onClick={() => void share()}
-            className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90"
-          >
-            <Share2 className="size-4" aria-hidden="true" />
-            Compartilhar
-          </button>
-          {mode === "free" ? (
+        {finished && (
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <button
               type="button"
-              onClick={startFree}
-              className="flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-bold transition-colors hover:bg-muted"
+              onClick={() => void share()}
+              className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90"
             >
-              <RotateCcw className="size-4" aria-hidden="true" />
-              Jogar de novo
+              <Share2 className="size-4" aria-hidden="true" />
+              Compartilhar
             </button>
-          ) : (
-            <p className="w-full text-center text-xs text-muted-foreground">
-              Volte amanhã para a próxima palavra — ou treine no modo livre.
-            </p>
-          )}
-        </div>
-      )}
-
-      <div className="flex w-full max-w-md flex-col gap-1.5">
-        {KEY_ROWS.map((rowKeys, index) => (
-          <div key={rowKeys} className="flex justify-center gap-1.5">
-            {index === KEY_ROWS.length - 1 && (
+            {mode === "free" ? (
               <button
                 type="button"
-                onClick={() => press("ENTER")}
-                aria-label="Enviar palavra"
-                className="flex h-12 items-center justify-center rounded-md bg-secondary px-2.5 text-xs font-bold uppercase text-secondary-foreground transition-colors hover:bg-muted"
+                onClick={startFree}
+                className="flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-bold transition-colors hover:bg-muted"
               >
-                <CornerDownLeft className="size-4" aria-hidden="true" />
+                <RotateCcw className="size-4" aria-hidden="true" />
+                Jogar de novo
               </button>
-            )}
-            {rowKeys.split("").map((key) => {
-              const hint = hints[key]
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => press(key)}
-                  className={`flex h-12 flex-1 items-center justify-center rounded-md text-sm font-bold uppercase transition-colors ${hint ? KEY_STYLES[hint] : "bg-secondary text-secondary-foreground hover:bg-muted"}`}
-                >
-                  {key}
-                </button>
-              )
-            })}
-            {index === KEY_ROWS.length - 1 && (
-              <button
-                type="button"
-                onClick={() => press("BACK")}
-                aria-label="Apagar letra"
-                className="flex h-12 items-center justify-center rounded-md bg-secondary px-2.5 text-xs font-bold uppercase text-secondary-foreground transition-colors hover:bg-muted"
-              >
-                <Delete className="size-4" aria-hidden="true" />
-              </button>
+            ) : (
+              <p className="w-full text-center text-xs text-muted-foreground">
+                Volte amanhã para a próxima palavra — ou treine no modo livre.
+              </p>
             )}
           </div>
-        ))}
-      </div>
+        )}
 
-      {mode === "daily" && stats.played > 0 && (
-        <section aria-label="Estatísticas" className="grid w-full max-w-md grid-cols-4 gap-2">
-          <StatTile value={stats.played} label="Jogos" />
-          <StatTile value={`${winRate(stats)}%`} label="Vitórias" />
-          <StatTile value={stats.currentStreak} label="Sequência" />
-          <StatTile value={stats.bestStreak} label="Melhor" />
-        </section>
-      )}
+        <div className="flex w-full max-w-md flex-col gap-1.5">
+          {KEY_ROWS.map((rowKeys, index) => (
+            <div key={rowKeys} className="flex justify-center gap-1.5">
+              {index === KEY_ROWS.length - 1 && (
+                <button
+                  type="button"
+                  onClick={() => press("ENTER")}
+                  aria-label="Enviar palavra"
+                  className="flex h-12 items-center justify-center rounded-md bg-secondary px-2.5 text-xs font-bold uppercase text-secondary-foreground transition-colors hover:bg-muted"
+                >
+                  <CornerDownLeft className="size-4" aria-hidden="true" />
+                </button>
+              )}
+              {rowKeys.split("").map((key) => {
+                const hint = hints[key]
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => press(key)}
+                    aria-label={key}
+                    className={`flex h-12 flex-1 items-center justify-center rounded-md text-sm font-bold uppercase transition-colors ${hint ? KEY_STYLES[hint] : "bg-secondary text-secondary-foreground hover:bg-muted"}`}
+                  >
+                    {key}
+                  </button>
+                )
+              })}
+              {index === KEY_ROWS.length - 1 && (
+                <button
+                  type="button"
+                  onClick={() => press("BACK")}
+                  aria-label="Apagar letra"
+                  className="flex h-12 items-center justify-center rounded-md bg-secondary px-2.5 text-xs font-bold uppercase text-secondary-foreground transition-colors hover:bg-muted"
+                >
+                  <Delete className="size-4" aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {mode === "daily" && stats.played > 0 && (
+          <section aria-label="Estatísticas" className="grid w-full max-w-md grid-cols-4 gap-2">
+            <StatTile value={stats.played} label="Jogos" />
+            <StatTile value={`${winRate(stats)}%`} label="Vitórias" />
+            <StatTile value={stats.currentStreak} label="Sequência" />
+            <StatTile value={stats.bestStreak} label="Melhor" />
+          </section>
+        )}
+      </div>{/* end panel-termo */}
     </div>
   )
 }

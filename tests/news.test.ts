@@ -45,11 +45,26 @@ describe("plainText", () => {
     expect(plainText("[object Object]Carpini, em coletiva")).toBe("Carpini, em coletiva")
     expect(plainText("Antes [object Object] depois")).toBe("Antes depois")
   })
+
+  it("strips trailing RSS boilerplate call-to-action phrases", () => {
+    expect(plainText("Notícia completa aqui. Clique aqui")).toBe("Notícia completa aqui.")
+    expect(plainText("Veja todas as fotos no site. Leia mais")).toBe("Veja todas as fotos no site.")
+    expect(plainText("Confira a matéria na íntegra. Saiba mais")).toBe("Confira a matéria na íntegra.")
+  })
+
+  it("strips leaked HTML image attributes from WordPress feeds", () => {
+    const leaked = 'Deutsche Bank " data-image-caption=" Deutsche Bank (Foto: REUTERS/Jon Nazca/File Photo) " data-large-file="https://www.infomoney.com.br/wp-content/uploads/2024/07/Captura-de-tela-2024-07-24-080431.png?fit=1093%2C730&qual...'
+    expect(plainText(leaked)).toBe("Deutsche Bank")
+  })
 })
 
 describe("truncate", () => {
-  it("returns the text unchanged when within the limit", () => {
-    expect(truncate("curto", 20)).toBe("curto")
+  it("preserves text with terminal punctuation within the limit", () => {
+    expect(truncate("Texto completo.", 20)).toBe("Texto completo.")
+  })
+
+  it("appends an ellipsis to text without terminal punctuation so it is not cut off abruptly", () => {
+    expect(truncate("Texto sem ponto", 20)).toBe("Texto sem ponto…")
   })
 
   it("cuts on a word boundary and appends an ellipsis", () => {

@@ -3,6 +3,7 @@
 import {
   Bookmark,
   Gamepad2,
+  GraduationCap,
   Moon,
   RefreshCw,
   Search,
@@ -63,16 +64,26 @@ export function Header({
 
   return (
     <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      {/* Skip link: visible only on focus — keyboard users jump straight to the news list. */}
+      <a
+        href="#conteudo"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-primary-foreground focus:shadow-lg"
+      >
+        Ir para o conteúdo
+      </a>
+
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-3 md:px-8 md:py-4">
-        <a
-          href="#conteudo"
+        {/* Logo — decorative link, not the skip link */}
+        <Link
+          href="/"
           className="flex items-center gap-3 transition-opacity hover:opacity-80"
+          aria-label="Órbita — página inicial"
         >
           <span className="flex size-9 items-center justify-center rounded-full bg-primary text-sm font-black text-primary-foreground">
             O
           </span>
           <span className="font-serif text-xl font-bold">ÓRBITA</span>
-        </a>
+        </Link>
         <div className="flex items-center gap-2">
           {showLiveIndicator && (
             <span className="live-badge hidden items-center gap-2 rounded-full border border-destructive/30 bg-destructive/10 px-3 py-1.5 text-xs font-bold uppercase text-destructive md:flex">
@@ -81,11 +92,18 @@ export function Header({
             </span>
           )}
           <Link
+            href="/estudantes"
+            aria-label="Área do estudante"
+            className="flex size-9 items-center justify-center rounded-full border border-border bg-background text-foreground transition-all duration-150 hover:bg-muted hover:shadow-sm active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <GraduationCap className="size-4" aria-hidden="true" />
+          </Link>
+          <Link
             href="/jogos"
             aria-label="Jogos"
             className="flex size-9 items-center justify-center rounded-full border border-border bg-background text-foreground transition-all duration-150 hover:bg-muted hover:shadow-sm active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <Gamepad2 className="size-4" />
+            <Gamepad2 className="size-4" aria-hidden="true" />
           </Link>
           <IconButton
             label={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
@@ -119,9 +137,10 @@ export function Header({
         </div>
       </div>
       <div className="mx-auto max-w-7xl px-5 pb-3 md:px-8 md:pb-4">
-        <div className="flex gap-2">
+        {/* role="search" landmarks the search area for assistive technologies. */}
+        <form role="search" aria-label="Busca de notícias" className="flex gap-2" onSubmit={(e) => e.preventDefault()}>
           <label className="flex min-w-0 flex-1 items-center gap-3 rounded-full border bg-muted px-4 py-2.5 focus-within:ring-2 focus-within:ring-ring md:py-3">
-            <Search className="size-5 text-muted-foreground" />
+            <Search className="size-5 text-muted-foreground" aria-hidden="true" />
             <span className="sr-only">Pesquisar notícias em toda a internet</span>
             <input
               ref={searchRef}
@@ -136,10 +155,10 @@ export function Header({
               <button
                 type="button"
                 onClick={() => onInputChange("")}
-                aria-label="Limpar pesquisa"
+                aria-label={`Limpar pesquisa por "${input}"`}
                 className="rounded-full p-1 transition-colors hover:bg-foreground/10"
               >
-                <X className="size-4" />
+                <X className="size-4" aria-hidden="true" />
               </button>
             )}
           </label>
@@ -167,7 +186,7 @@ export function Header({
               </span>
             )}
           </div>
-        </div>
+        </form>
       </div>
     </header>
   )

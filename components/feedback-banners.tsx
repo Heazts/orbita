@@ -19,22 +19,32 @@ export function NoticeBanner({ notice }: { notice: string }) {
 // Shown when the news request fails. `message` comes from the fetcher, which
 // distinguishes rate limiting from a generic outage.
 export function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const is429 = message.includes("Muitas buscas") || message.includes("429")
+  const errorCode = is429 ? "429" : "503"
+
   return (
     <div
       role="alert"
-      className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm"
     >
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-destructive/10">
-        <RefreshCw className="size-4 text-destructive" aria-hidden="true" />
-      </div>
-      <div>
-        <p className="font-medium">{message}</p>
-        <p className="text-xs text-muted-foreground">Tente novamente em alguns instantes.</p>
+      <div className="flex items-center gap-3">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive font-bold text-xs">
+          {errorCode}
+        </div>
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-black uppercase text-destructive">
+              Erro {errorCode}
+            </span>
+            <p className="font-bold text-foreground">{message}</p>
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">Tente novamente em alguns instantes ou verifique o status da rede.</p>
+        </div>
       </div>
       <button
         type="button"
         onClick={onRetry}
-        className="ml-auto shrink-0 rounded-full border border-destructive/30 px-3 py-1.5 text-xs font-bold text-destructive transition-colors hover:bg-destructive/10"
+        className="shrink-0 rounded-full border border-destructive/30 px-4 py-2 text-xs font-bold text-destructive transition-colors hover:bg-destructive/10"
       >
         Tentar novamente
       </button>
@@ -48,9 +58,9 @@ export function FailedSourcesBanner({ sources }: { sources: string[] }) {
   return (
     <div
       role="status"
-      className="flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-muted-foreground"
+      className="flex items-center gap-2 rounded-xl border bg-muted/50 p-3 text-xs text-muted-foreground"
     >
-      <span className="inline-block size-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
+      <span className="inline-block size-1.5 shrink-0 rounded-full bg-muted-foreground" aria-hidden="true" />
       Algumas fontes estão indisponíveis no momento: {sources.join(", ")}.
     </div>
   )

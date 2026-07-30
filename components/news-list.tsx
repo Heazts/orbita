@@ -1,6 +1,5 @@
 "use client"
 
-import type { CSSProperties } from "react"
 import type { NewsItem } from "@/lib/news"
 import { NewsCard } from "@/components/news-card"
 
@@ -11,6 +10,8 @@ type NewsListProps = {
   favorites: Record<string, NewsItem>
   onToggleFavorite: (item: NewsItem) => void
   onShare: (item: NewsItem) => void
+  onAiSummary?: (item: NewsItem) => void
+  onShowSources?: (item: NewsItem) => void
 }
 
 export function NewsList({
@@ -20,6 +21,8 @@ export function NewsList({
   favorites,
   onToggleFavorite,
   onShare,
+  onAiSummary,
+  onShowSources,
 }: NewsListProps) {
   return (
     <section className="flex flex-col">
@@ -30,10 +33,12 @@ export function NewsList({
           now={now}
           query={query}
           lead={index === 0 && !query}
-          style={{ "--stagger": index } as CSSProperties}
+          staggerIndex={index}
           favorite={Boolean(favorites[item.id])}
           onFavorite={() => onToggleFavorite(item)}
           onShare={() => onShare(item)}
+          onAiSummary={() => onAiSummary?.(item)}
+          onShowSources={() => onShowSources?.(item)}
         />
       ))}
     </section>

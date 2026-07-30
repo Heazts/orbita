@@ -1,5 +1,8 @@
-type Period = "all" | "1" | "7" | "30" | "live"
-type Sort = "latest" | "relevance"
+import type { Period, Sort } from "@/lib/types"
+
+// Re-export for consumers that imported Period/Sort from this file before the
+// shared types were extracted. This avoids breaking any existing imports.
+export type { Period, Sort }
 
 type FiltersProps = {
   period: Period

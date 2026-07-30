@@ -26,6 +26,11 @@ export type NewsItem = {
   source: string
   category: Exclude<NewsCategory, "Todas">
   publishedAt: string
+  // Set only when lib/clustering.ts merges this item with equivalent coverage
+  // from other outlets (same story, different URL/headline). Absent — not 1 —
+  // for a story with no known duplicates, so the common case carries no noise.
+  sourcesCount?: number
+  relatedSources?: string[]
 }
 
 export type NewsResponse = {
@@ -52,8 +57,8 @@ export const FEED_SOURCES: FeedSource[] = [
     category: "Mundo",
   },
   {
-    name: "DW Brasil",
-    url: "https://rss.dw.com/rdf/rss-br-all",
+    name: "CNN Brasil",
+    url: "https://admin.cnnbrasil.com.br/feed/",
     category: "Mundo",
   },
   {
@@ -67,8 +72,33 @@ export const FEED_SOURCES: FeedSource[] = [
     category: "Política",
   },
   {
+    name: "Poder360",
+    url: "https://www.poder360.com.br/feed/",
+    category: "Política",
+  },
+  {
+    name: "InfoMoney",
+    url: "https://www.infomoney.com.br/feed/",
+    category: "Economia",
+  },
+  {
+    name: "Exame",
+    url: "https://exame.com/feed/",
+    category: "Economia",
+  },
+  {
     name: "Olhar Digital",
     url: "https://olhardigital.com.br/feed/",
+    category: "Tecnologia",
+  },
+  {
+    name: "Tecnoblog",
+    url: "https://tecnoblog.net/feed/",
+    category: "Tecnologia",
+  },
+  {
+    name: "Canaltech",
+    url: "https://canaltech.com.br/rss/",
     category: "Tecnologia",
   },
   {
@@ -109,6 +139,16 @@ export const FEED_SOURCES: FeedSource[] = [
   {
     name: "Agência Brasil — Educação",
     url: "https://agenciabrasil.ebc.com.br/rss/educacao/feed.xml",
+    category: "Educação",
+  },
+  {
+    name: "Guia do Estudante",
+    url: "https://guiadoestudante.abril.com.br/feed/",
+    category: "Educação",
+  },
+  {
+    name: "Revista Educação",
+    url: "https://revistaeducacao.com.br/feed/",
     category: "Educação",
   },
   {
@@ -187,6 +227,50 @@ const ENTITY_MAP: Record<string, string> = {
   "&lt;": "<",
   "&gt;": ">",
   "&amp;": "&",
+  // Portuguese accents and special characters
+  "&aacute;": "á", "&Aacute;": "Á",
+  "&acirc;": "â", "&Acirc;": "Â",
+  "&agrave;": "à", "&Agrave;": "À",
+  "&aring;": "å", "&Aring;": "Å",
+  "&atilde;": "ã", "&Atilde;": "Ã",
+  "&auml;": "ä", "&Auml;": "Ä",
+  "&ccedil;": "ç", "&Ccedil;": "Ç",
+  "&eacute;": "é", "&Eacute;": "É",
+  "&ecirc;": "ê", "&Ecirc;": "Ê",
+  "&egrave;": "è", "&Egrave;": "È",
+  "&euml;": "ë", "&Euml;": "Ë",
+  "&iacute;": "í", "&Iacute;": "Í",
+  "&icirc;": "î", "&Icirc;": "Î",
+  "&igrave;": "ì", "&Igrave;": "Ì",
+  "&iuml;": "ï", "&Iuml;": "Ï",
+  "&ntilde;": "ñ", "&Ntilde;": "Ñ",
+  "&oacute;": "ó", "&Oacute;": "Ó",
+  "&ocirc;": "ô", "&Ocirc;": "Ô",
+  "&ograve;": "ò", "&Ograve;": "Ò",
+  "&otilde;": "õ", "&Otilde;": "Õ",
+  "&ouml;": "ö", "&Ouml;": "Ö",
+  "&uacute;": "ú", "&Uacute;": "Ú",
+  "&ucirc;": "û", "&Ucirc;": "Û",
+  "&ugrave;": "ù", "&Ugrave;": "Ù",
+  "&uuml;": "ü", "&Uuml;": "Ü",
+  // Punctuation and symbols
+  "&bull;": "•",
+  "&hellip;": "…",
+  "&ndash;": "–",
+  "&mdash;": "—",
+  "&lsquo;": "‘",
+  "&rsquo;": "’",
+  "&ldquo;": "“",
+  "&rdquo;": "”",
+  "&laquo;": "«",
+  "&raquo;": "»",
+  "&deg;": "°",
+  "&ordm;": "º",
+  "&orda;": "ª",
+  "&copy;": "©",
+  "&reg;": "®",
+  "&trade;": "™",
+  "&euro;": "€",
 }
 
 const HEX_ENTITY = /&#x([0-9a-fA-F]+);/g
@@ -202,21 +286,35 @@ export function decodeEntities(value: string): string {
   return text
 }
 
+// Leaked HTML attribute key-value pairs from WordPress feed images (e.g. data-image-caption="...", data-large-file="...")
+const LEAKED_ATTR_REGEX =
+  /(?:^|\s)(?:data-[a-z0-9_-]+|srcset|sizes|width|height|alt|src|class|style|id|loading|decoding|referrerpolicy)=(?:"[^"]*"|'[^']*'|\S+)/gi
+
+// Boilerplate call-to-action phrases frequently appended to RSS feed descriptions/titles
+const BOILERPLATE_REGEX =
+  /\s*(?:(?:clique|acesse|saiba|leia|confira|veja|assista|ouça)\s+(?:aqui|mais|na íntegra|no site|o vídeo|o áudio|a matéria|a reportagem)|leia mais|saiba mais|confira|veja mais|matéria completa|notícia completa|foto:|\[\+\]|\.\.\.)\s*\.?$/gi
+
 // Some feeds (e.g. Agência Brasil) double-encode embedded HTML, so literal
 // tags survive as "&lt;p&gt;" after the XML parser's single decode pass.
 // Decode entities and strip tags across two passes to unwrap that safely.
 export function plainText(value: unknown): string {
   if (typeof value !== "string") return ""
   let text = value
+  // Strip embedded script and style elements first to prevent script/style blocks from bleeding into description text
+  text = text.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ")
   for (let pass = 0; pass < 2; pass += 1) {
     text = decodeEntities(text).replace(/<[^>]*>/g, " ")
   }
+  // Strip leaked HTML attribute key-value pairs from WordPress feed images
+  text = text.replace(LEAKED_ATTR_REGEX, " ")
   // Some publishers (seen in Globo/GE descriptions) leak a JavaScript object
   // straight into the feed, so the text literally contains "[object Object]".
-  // It's never real content — strip it regardless of which feed it came from.
+  // Strip it and any trailing boilerplate call-to-action ("Clique aqui", etc.).
   return text
     .replace(/\[object Object\]/gi, " ")
+    .replace(BOILERPLATE_REGEX, "")
     .replace(/\s+/g, " ")
+    .replace(/^["'\s]+|["'\s]+$/g, "")
     .trim()
 }
 
@@ -229,12 +327,35 @@ export function normalize(value: string): string {
 // space is reasonably close to the limit we cut there; otherwise (a single very
 // long token) we hard-cut. Trailing punctuation/whitespace is stripped before
 // the ellipsis so we never get "palavra ,\u2026" or "palavra\u2014\u2026".
+// If text does not end with terminal punctuation (. ! ?), an ellipsis is added
+// so descriptions never appear cut off "no seco".
 export function truncate(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text
-  const clipped = text.slice(0, maxLength)
-  const lastSpace = clipped.lastIndexOf(" ")
-  const base = lastSpace > maxLength * 0.5 ? clipped.slice(0, lastSpace) : clipped
-  return `${base.replace(/[\s.,;:!?\u2014\u2013-]+$/, "")}\u2026`
+  const cleaned = plainText(text)
+  if (!cleaned) return ""
+  if (cleaned.length > maxLength) {
+    const clipped = cleaned.slice(0, maxLength)
+    const lastSpace = clipped.lastIndexOf(" ")
+    const base = lastSpace > maxLength * 0.5 ? clipped.slice(0, lastSpace) : clipped
+    return `${base.replace(/[\s.,;:!?\u2014\u2013-]+$/, "")}\u2026`
+  }
+  // Append ellipsis if sentence does not end with terminal punctuation
+  if (!/[.!?]$/.test(cleaned)) {
+    return `${cleaned.replace(/[\s.,;:!?\u2014\u2013-]+$/, "")}\u2026`
+  }
+  return cleaned
+}
+
+// Category badge styling. Deliberately monochrome: the design system is a
+// single palette (white / #111111 / #6B7280 / #E5E7EB, blue #2563EB for
+// emphasis, red #DC2626 for urgency), so categories are distinguished by their
+// *label*, not by 11 competing hues. The lead card gets the solid blue fill;
+// every other card gets a quiet outline that doesn't fight the headline for
+// attention. Colour is never the sole carrier of meaning (WCAG 1.4.1) — the
+// category name is always spelled out inside the badge.
+export function getCategoryBadgeStyle(lead = false): string {
+  return lead
+    ? "bg-primary text-primary-foreground border border-primary"
+    : "bg-transparent text-muted-foreground border border-border"
 }
 
 export function inferCategory(

@@ -121,8 +121,15 @@ export function parseFeed(xml: string, source: FeedSource, isGoogle = false): Ne
   return rawItems
     .map((item): NewsItem | null => {
       const rawTitle = plainText(textValue(item.title))
+      if (
+        !rawTitle ||
+        /^https?:\/\//i.test(rawTitle) ||
+        /^(?:clique aqui|leia mais|saiba mais|confira|sem título)$/i.test(rawTitle)
+      ) {
+        return null
+      }
       const url = findLink(item)
-      if (!rawTitle || !/^https:\/\//.test(url)) return null
+      if (!/^https:\/\//.test(url)) return null
 
       const trimmedUrl = url.trim()
       if (!HTTPS_URL.test(trimmedUrl)) return null

@@ -28,11 +28,12 @@ pnpm start         # serve o build de produção
 
 ```
 app/
-  api/news/route.ts   # agrega os feeds RSS e a busca no Google News
+  api/news/route.ts   # parseia query params, aplica rate limit e chama lib/aggregate.ts
+  api/finance/route.ts # busca cotações no servidor (mesma origem, evita bloqueio de CSP)
   layout.tsx           # metadados, fontes e tema
-  page.tsx              # ponto de entrada da página
+  page.tsx              # Server Component: busca a visão padrão e renderiza a home com dados reais (SSR)
 components/
-  news-dashboard.tsx   # interface do painel (estado de UI e busca/filtros)
+  news-dashboard.tsx   # interface do painel (estado de UI e busca/filtros), recebe initialData do servidor
 hooks/
   use-favorites.ts      # favoritos persistidos em localStorage
   use-search-history.ts # histórico de busca persistido em localStorage
@@ -42,6 +43,8 @@ hooks/
 lib/
   news.ts               # tipos, fontes de feed, categorias e utilitários de texto
   parse.ts              # parsing de RSS/Atom e cálculo de relevância (testável)
+  aggregate.ts          # busca feeds + Google News, dedupe/cluster, filtra e ordena — usado pela rota e pela home (SSR)
+  clustering.ts          # agrupa notícias equivalentes de fontes diferentes (similaridade de Jaccard)
   rate-limit.ts          # rate limiter em memória por IP
   storage.ts             # helpers de leitura/escrita em localStorage
   site.ts               # constantes do site (URL, título, descrição)
@@ -49,6 +52,7 @@ proxy.ts                 # CSP com nonce por request (convenção "proxy" do Nex
 tests/
   news.test.ts          # testes de lib/news.ts
   parse.test.ts         # testes de lib/parse.ts (com fixtures de feed)
+  clustering.test.ts    # testes de lib/clustering.ts (agrupamento e Jaccard)
   rate-limit.test.ts    # testes de lib/rate-limit.ts
   hooks/                 # testes dos hooks (ambiente jsdom + Testing Library)
 ```
@@ -61,6 +65,8 @@ A interface é mobile-first com Tailwind (`sm:`/`md:`/`lg:`), testada em 320px, 
 
 - Agrega fontes públicas de mundo (BBC Brasil, DW Brasil, Euronews), Brasil e política (Agência Brasil), tecnologia (Olhar Digital), ciência (NASA), esportes (GE), saúde (Agência Brasil Saúde), meio ambiente (WWF, G1 Natureza), entretenimento (G1 Pop & Arte), educação (G1 Educação, Agência Brasil Educação), cibersegurança e IA (The Hacker News) e boas notícias (Razões para Acreditar), com busca global via Google News.
 - Categorias: Mundo, Boas notícias, Política, Economia, Tecnologia, Cyber & IA, Ciência, Educação, Saúde, Esportes, Cultura, Entretenimento e Meio Ambiente, inferidas por palavra-chave a partir do título/descrição.
+- **Renderizada no servidor**: a home busca a visão padrão em `app/page.tsx` (Server Component) e entrega HTML com manchetes reais na primeira resposta — o painel interativo (`NewsDashboard`) hidrata sobre esses dados em vez de partir de uma tela vazia, o que melhora o LCP e mantém o conteúdo visível mesmo sem JavaScript.
+- **Agrupamento de notícias equivalentes**: a mesma notícia coberta por fontes diferentes (títulos e URLs distintos) é agrupada por similaridade de texto (`lib/clustering.ts`) em vez de aparecer duplicada; o card líder do grupo mostra um selo "N fontes" com as demais fontes no tooltip.
 - **Curadoria equilibrada na home**: a visão inicial (sem filtro) abre com um destaque leve e variado e mantém o topo diverso, sem começar por uma sequência de notícias pesadas — nada é escondido, só reordenado (`curateHomepage`). Ao pesquisar, filtrar ou entrar no modo ao vivo, a ordem cronológica/relevância é respeitada.
 - **Preferências (só no navegador)**: painel para escolher o **tema** (Claro, Escuro ou Sistema — que acompanha o aparelho ao vivo), o *tom das notícias* (Equilibrado, que esconde notícias pesadas ao navegar, ou Completo), ligar/desligar os *avisos de novas matérias* e *reduzir animações*, além de **limpar o histórico de busca** com um clique. Persistidas em `localStorage` (`hooks/use-preferences.ts`, `hooks/use-theme.ts`).
 - **Páginas de políticas**: `/privacidade` e `/termos` (estáticas, linkadas no rodapé), descrevendo honestamente que não há cadastro e que os dados ficam só no navegador.

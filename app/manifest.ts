@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "As principais notícias do Brasil e do mundo, reunidas de fontes públicas e atualizadas ao vivo.",
     start_url: "/",
     display: "standalone",
-    background_color: "#0a0a0a",
-    theme_color: "#0a0a0a",
+    background_color: "#111111",
+    theme_color: "#111111",
     lang: "pt-BR",
     categories: ["news", "magazines"],
     icons: [

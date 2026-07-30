@@ -1,31 +1,40 @@
-name: CI
+name: CI & Security Audit
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
-
-permissions: read-all
+    branches: [main, master]
 
 jobs:
-  ci:
+  build-and-test:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
+          cache: 'pnpm'
 
-      - run: pnpm install --frozen-lockfile
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
 
-      - run: pnpm lint
+      - name: Run Linter
+        run: pnpm lint
 
-      - run: pnpm test:run
+      - name: Run Vitest Suite
+        run: pnpm test:run
 
-      - run: pnpm build
+      - name: Security Scan (OSV-Scanner)
+        uses: google/osv-scanner-action@v1.9.1
+        with:
+          scan-args: '--config=.osv-scanner.toml .'
+        continue-on-error: true

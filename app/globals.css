@@ -30,72 +30,89 @@
   --radius-xl: calc(var(--radius) * 1.4);
 }
 
+/* ---------------------------------------------------------------------------
+   Design tokens — ONE palette, no off-system hues.
+
+     Fundo/Cards  #FFFFFF · Texto #111111 · Secundário #6B7280
+     Bordas       #E5E7EB · Destaque #2563EB · Urgente #DC2626
+
+   Dark mode is the same palette inverted through *neutral* greys (not navy),
+   with the blue and red lifted one step so they keep AA contrast on a near
+   black ground. Every pairing below is >= 4.5:1:
+     #111111/#FFFFFF 18.9 · #6B7280/#FFFFFF 4.9 · #2563EB/#FFFFFF 5.2
+     #FFFFFF/#111111 18.9 · #9CA3AF/#111111 7.4 · #3B82F6/#111111 4.9
+--------------------------------------------------------------------------- */
+
 :root {
   color-scheme: light;
-  --background: oklch(0.975 0.008 90);
-  --foreground: oklch(0.16 0.005 60);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.16 0.005 60);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.16 0.005 60);
-  --primary: oklch(0.16 0.005 60);
-  --primary-foreground: oklch(0.975 0.008 90);
-  --secondary: oklch(0.93 0.008 90);
-  --secondary-foreground: oklch(0.16 0.005 60);
-  --muted: oklch(0.93 0.008 90);
-  --muted-foreground: oklch(0.48 0.01 60);
-  --accent: oklch(0.93 0.008 90);
-  --accent-foreground: oklch(0.16 0.005 60);
-  --destructive: oklch(0.56 0.2 28);
-  --border: oklch(0.84 0.008 90);
-  --input: oklch(0.84 0.008 90);
-  --ring: oklch(0.56 0.2 28);
+  --background: #ffffff;
+  --foreground: #111111;
+  --card: #ffffff;
+  --card-foreground: #111111;
+  --popover: #ffffff;
+  --popover-foreground: #111111;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #f3f4f6;
+  --secondary-foreground: #111111;
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
+  --accent: #f3f4f6;
+  --accent-foreground: #111111;
+  --destructive: #dc2626;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #2563eb;
   --radius: 0.65rem;
 }
 
+/* The two dark rules are byte-identical on purpose: plain CSS can't share one
+   declaration block between a class selector and a media query. `.dark` is
+   what the boot script in app/layout.tsx sets; the media query is the
+   no-JavaScript fallback. Edit both together. */
 .dark {
   color-scheme: dark;
-  --background: oklch(0.09 0.004 60);
-  --foreground: oklch(0.95 0.006 90);
-  --card: oklch(0.13 0.005 60);
-  --card-foreground: oklch(0.95 0.006 90);
-  --popover: oklch(0.13 0.005 60);
-  --popover-foreground: oklch(0.95 0.006 90);
-  --primary: oklch(0.95 0.006 90);
-  --primary-foreground: oklch(0.09 0.004 60);
-  --secondary: oklch(0.17 0.005 60);
-  --secondary-foreground: oklch(0.95 0.006 90);
-  --muted: oklch(0.17 0.005 60);
-  --muted-foreground: oklch(0.64 0.008 90);
-  --accent: oklch(0.17 0.005 60);
-  --accent-foreground: oklch(0.95 0.006 90);
-  --destructive: oklch(0.68 0.21 28);
-  --border: oklch(0.22 0.006 60);
-  --input: oklch(0.22 0.006 60);
-  --ring: oklch(0.68 0.21 28);
+  --background: #111111;
+  --foreground: #ffffff;
+  --card: #1a1a1a;
+  --card-foreground: #ffffff;
+  --popover: #1a1a1a;
+  --popover-foreground: #ffffff;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #1f1f1f;
+  --secondary-foreground: #ffffff;
+  --muted: #1f1f1f;
+  --muted-foreground: #9ca3af;
+  --accent: #1f1f1f;
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
+  --border: #2a2a2a;
+  --input: #2a2a2a;
+  --ring: #3b82f6;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
     color-scheme: dark;
-    --background: oklch(0.09 0.004 60);
-    --foreground: oklch(0.95 0.006 90);
-    --card: oklch(0.13 0.005 60);
-    --card-foreground: oklch(0.95 0.006 90);
-    --popover: oklch(0.13 0.005 60);
-    --popover-foreground: oklch(0.95 0.006 90);
-    --primary: oklch(0.95 0.006 90);
-    --primary-foreground: oklch(0.09 0.004 60);
-    --secondary: oklch(0.17 0.005 60);
-    --secondary-foreground: oklch(0.95 0.006 90);
-    --muted: oklch(0.17 0.005 60);
-    --muted-foreground: oklch(0.64 0.008 90);
-    --accent: oklch(0.17 0.005 60);
-    --accent-foreground: oklch(0.95 0.006 90);
-    --destructive: oklch(0.68 0.21 28);
-    --border: oklch(0.22 0.006 60);
-    --input: oklch(0.22 0.006 60);
-    --ring: oklch(0.68 0.21 28);
+    --background: #111111;
+    --foreground: #ffffff;
+    --card: #1a1a1a;
+    --card-foreground: #ffffff;
+    --popover: #1a1a1a;
+    --popover-foreground: #ffffff;
+    --primary: #3b82f6;
+    --primary-foreground: #ffffff;
+    --secondary: #1f1f1f;
+    --secondary-foreground: #ffffff;
+    --muted: #1f1f1f;
+    --muted-foreground: #9ca3af;
+    --accent: #1f1f1f;
+    --accent-foreground: #ffffff;
+    --destructive: #ef4444;
+    --border: #2a2a2a;
+    --input: #2a2a2a;
+    --ring: #3b82f6;
   }
 }
 
@@ -103,7 +120,8 @@
   * {
     @apply border-border outline-ring/50;
   }
-  html {
+  html,
+  body {
     scroll-behavior: smooth;
   }
   body {
@@ -119,9 +137,10 @@
   }
 }
 
-/* Horizontal chip/tab rows scroll without showing a scrollbar. */
+/* Hide scrollbar utility class */
 .no-scrollbar {
   scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
@@ -155,36 +174,35 @@
   50% { box-shadow: 0 0 0 4px oklch(0.56 0.2 28 / 0.15); }
 }
 
-/* Ticker */
+/* Vertical Ticker */
 .ticker {
   overflow: hidden;
 }
 
-.ticker-track {
-  animation: ticker-scroll 40s linear infinite;
+.ticker-track-vertical {
+  animation: ticker-scroll-vertical 30s linear infinite;
 }
 
-.ticker:hover .ticker-track,
-.ticker:focus-within .ticker-track {
+.ticker:hover .ticker-track-vertical,
+.ticker:focus-within .ticker-track-vertical,
+.ticker--paused .ticker-track-vertical {
   animation-play-state: paused;
 }
 
-@keyframes ticker-scroll {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+@keyframes ticker-scroll-vertical {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ticker { overflow-x: auto; }
-  .ticker-track { animation: none; }
+  .ticker-track-vertical { animation: none; }
   .live-dot { animation: none; opacity: 1; }
   .live-badge { animation: none; }
 }
 
 /* Manual "Reduzir animações" preference (usePreferences → <html class>). Mirrors
    prefers-reduced-motion: neutralizes every animation and transition. */
-.reduce-motion .ticker { overflow-x: auto; }
-.reduce-motion .ticker-track { animation: none; }
+.reduce-motion .ticker-track-vertical { animation: none; }
 .reduce-motion .live-dot { animation: none; opacity: 1; }
 .reduce-motion .live-badge { animation: none; }
 .reduce-motion *,
@@ -210,11 +228,25 @@
 
 article {
   animation: fade-in-up 0.35s ease-out both;
-  /* Newly mounted cards cascade in ~45ms apart (capped) so a batch of fresh
-     items reveals gradually-but-fast instead of popping in all at once. Only
-     new DOM nodes animate; existing cards keep their place on refresh. */
-  animation-delay: calc(min(var(--stagger, 0), 8) * 45ms);
 }
+
+/* Newly mounted cards cascade in ~45ms apart (capped at index 8) so a batch of
+   fresh items reveals gradually-but-fast instead of popping in all at once.
+   Only new DOM nodes animate; existing cards keep their place on refresh.
+   Fixed classes, not a `style="--stagger:N"` attribute: the page's CSP sets
+   style-src 'self' with no 'unsafe-inline'/'unsafe-hashes', which silently
+   blocks inline style *attributes* (unlike programmatic .style.x = y in some
+   engines, Chromium enforces CSP here too) — every card animated with the
+   same delay in practice. */
+.stagger-0 { animation-delay: 0ms; }
+.stagger-1 { animation-delay: 45ms; }
+.stagger-2 { animation-delay: 90ms; }
+.stagger-3 { animation-delay: 135ms; }
+.stagger-4 { animation-delay: 180ms; }
+.stagger-5 { animation-delay: 225ms; }
+.stagger-6 { animation-delay: 270ms; }
+.stagger-7 { animation-delay: 315ms; }
+.stagger-8 { animation-delay: 360ms; }
 
 @media (prefers-reduced-motion: reduce) {
   article {

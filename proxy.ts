@@ -14,7 +14,7 @@ function buildCsp(nonce: string): string {
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}'${isDev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self'",
-    "img-src 'self' https: data:",
+    "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
     `connect-src 'self'${isDev ? " ws:" : ""}`,
     // The service worker (public/sw.js) and the PWA manifest are same-origin.

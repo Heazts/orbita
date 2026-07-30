@@ -2,6 +2,7 @@
 
 import useSWR from "swr"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import type { Period, Sort } from "@/lib/types"
 import { useFavorites } from "@/hooks/use-favorites"
 import { useNow } from "@/hooks/use-now"
 import { useSearchHistory } from "@/hooks/use-search-history"
@@ -17,6 +18,9 @@ import {
   type NewsItem,
   type NewsResponse,
 } from "@/lib/news"
+import { AiSummaryModal } from "@/components/ai-summary-modal"
+import { SourcesModal } from "@/components/sources-modal"
+import { FinancialTicker } from "@/components/financial-ticker"
 import { SkeletonCard } from "@/components/ui/skeleton-card"
 import { Header } from "@/components/header"
 import { Filters } from "@/components/filters"
@@ -53,8 +57,8 @@ const fetcher = async (url: string): Promise<NewsResponse> => {
   return response.json()
 }
 
-type Period = "all" | "1" | "7" | "30" | "live"
-type Sort = "latest" | "relevance"
+// Period and Sort are imported from @/lib/types (single source of truth).
+// They were previously duplicated here and in filters.tsx without export.
 
 // Only these names pass the API's source validation, so the picker must offer
 // exactly them: listing sources scraped from the current response both trapped
@@ -81,7 +85,14 @@ function buildApiUrl(query: string, category: NewsCategory, period: Period, sort
   return `/api/news${queryString ? `?${queryString}` : ""}`
 }
 
-export function NewsDashboard() {
+type NewsDashboardProps = {
+  // Server-fetched default view (see app/page.tsx), used as SWR's fallbackData
+  // so the first paint has real headlines instead of a skeleton — independent
+  // of client hydration/now(), unlike the synthetic fallback below.
+  initialData?: NewsResponse
+}
+
+export function NewsDashboard({ initialData }: NewsDashboardProps) {
   const now = useNow()
   const { prefs } = usePreferences()
   // Single theme instance shared by the header toggle and the preferences
@@ -102,6 +113,8 @@ export function NewsDashboard() {
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [notice, setNotice] = useState("")
   const [newCount, setNewCount] = useState(0)
+  const [selectedAiItem, setSelectedAiItem] = useState<NewsItem | null>(null)
+  const [selectedSourcesItem, setSelectedSourcesItem] = useState<NewsItem | null>(null)
   const previousItemIds = useRef<string[]>([])
 
   const fallbackItems = useMemo(
@@ -126,21 +139,30 @@ export function NewsDashboard() {
     [query, category, period, sort, source],
   )
 
-  const showFallback =
-    now !== null && !query && category === "Todas" && period === "all" && source === "Todas"
+  // Whether the reader is on the plain, unfiltered view apiUrl is built for
+  // (the only one the server pre-fetches). Deliberately not gated on
+  // `now !== null`: that gate previously meant fallbackData was only ever
+  // used post-hydration, so the server-rendered HTML (and the first client
+  // render, which must match it) always showed the loading skeleton instead
+  // of any fallback content.
+  const isDefaultView = !query && category === "Todas" && period === "all" && source === "Todas"
+
+  // Prefer the server-fetched initialData (real data, valid even during SSR).
+  // Only fall back to the synthetic FALLBACK_NEWS-with-fresh-dates once
+  // hydrated and no initialData was supplied (e.g. NewsDashboard used without
+  // a server-rendering parent).
+  const fallbackData = isDefaultView
+    ? initialData ??
+      (now !== null
+        ? { items: fallbackItems, updatedAt: new Date(now).toISOString(), sourceCount: 0, isFallback: true }
+        : undefined)
+    : undefined
 
   const { data, error, isLoading, isValidating, mutate } = useSWR<NewsResponse>(apiUrl, fetcher, {
     refreshInterval: isLivePeriod ? 30_000 : 45_000,
     refreshWhenHidden: false,
     dedupingInterval: isLivePeriod ? 15_000 : 5_000,
-    fallbackData: showFallback
-      ? {
-          items: fallbackItems,
-          updatedAt: new Date(now).toISOString(),
-          sourceCount: 0,
-          isFallback: true,
-        }
-      : undefined,
+    fallbackData,
     keepPreviousData: true,
   })
 
@@ -164,6 +186,7 @@ export function NewsDashboard() {
   }, [newCount])
 
   const tickerItems = useMemo(() => (data?.items ?? []).slice(0, 12), [data?.items])
+
 
   // "Equilibrado" hides heavy/pessimistic items while browsing (never while
   // searching or in favorites, where intent is explicit). If that would empty
@@ -268,6 +291,12 @@ export function NewsDashboard() {
         }}
       />
 
+      {/* aria-live region: announces result count to screen readers when a
+          search completes without requiring the user to navigate to the list. */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {!isLoading && !isValidating && `${items.length} notícia${items.length !== 1 ? "s" : ""} encontrada${items.length !== 1 ? "s" : ""}`}
+      </div>
+
       <main id="conteudo" className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-6 md:px-8 md:py-8">
         {visibleNewCount > 0 && !favoritesOnly && !query && <NewItemsPill count={visibleNewCount} />}
 
@@ -282,6 +311,8 @@ export function NewsDashboard() {
         />
 
         {notice && <NoticeBanner notice={notice} />}
+
+        {category === "Economia" && <FinancialTicker />}
 
         {error && (
           <ErrorBanner
@@ -314,11 +345,21 @@ export function NewsDashboard() {
               favorites={favorites}
               onToggleFavorite={toggleFavorite}
               onShare={(item) => void share(item)}
+              onAiSummary={setSelectedAiItem}
+              onShowSources={setSelectedSourcesItem}
             />
             <Sidebar onClear={clear} />
           </div>
         )}
       </main>
+
+      {selectedAiItem && (
+        <AiSummaryModal item={selectedAiItem} onClose={() => setSelectedAiItem(null)} />
+      )}
+
+      {selectedSourcesItem && (
+        <SourcesModal item={selectedSourcesItem} onClose={() => setSelectedSourcesItem(null)} />
+      )}
 
       <SiteFooter onOpenPreferences={openPreferences} />
       <BackToTop />

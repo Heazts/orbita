@@ -1,4 +1,3 @@
-import { Analytics } from "@vercel/analytics/next"
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono, Lora } from "next/font/google"
 import { headers } from "next/headers"
@@ -83,8 +82,8 @@ const jsonLd = {
 export const viewport: Viewport = {
   colorScheme: "light dark",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f7f6f2" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+    { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
+    { media: "(prefers-color-scheme: dark)", color: "#111111" },
   ],
 }
 
@@ -95,15 +94,21 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   return (
     <html lang="pt-BR" suppressHydrationWarning className={`${geist.variable} ${geistMono.variable} ${lora.variable}`}>
       <head>
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('orbita-theme');var d=t==='dark'||((!t||t==='system')&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.add(d?'dark':'light')}catch(e){document.documentElement.classList.add('light')}})()` }} />
-        <script nonce={nonce} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        {/* suppressHydrationWarning: browsers intentionally scrub the `nonce`
+            attribute/property back to "" once a script node is parsed into the
+            document (a security measure so page script can't read its own
+            nonce back out via the DOM). React's hydration diff sees the
+            server's real nonce vs. the client's blanked one and flags it as a
+            mismatch — expected and harmless here, not an actual difference to
+            patch up. */}
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('orbita-theme');var d=t==='dark'||((!t||t==='system')&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.add(d?'dark':'light')}catch(e){document.documentElement.classList.add('light')}})()` }} />
+        <script nonce={nonce} suppressHydrationWarning type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       </head>
       <body className="font-sans antialiased">
         <ErrorBoundary>
           {children}
         </ErrorBoundary>
         <ServiceWorkerRegister />
-        {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
     </html>
   )

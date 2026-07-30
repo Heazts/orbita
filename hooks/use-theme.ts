@@ -21,8 +21,8 @@ function resolve(mode: ThemeMode): Theme {
 
 // Background colors mirrored from the themeColor entries in app/layout.tsx.
 const THEME_COLOR: Record<Theme, string> = {
-  light: "#f7f6f2",
-  dark: "#0a0a0a",
+  light: "#FFFFFF",
+  dark: "#111111",
 }
 
 function applyClass(theme: Theme): void {

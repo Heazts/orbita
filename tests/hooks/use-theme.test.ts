@@ -121,10 +121,10 @@ describe("useTheme", () => {
 
     const { result } = renderHook(() => useTheme())
     act(() => result.current.setMode("dark"))
-    expect(meta.getAttribute("content")).toBe("#0a0a0a")
+    expect(meta.getAttribute("content")).toBe("#111111")
 
     act(() => result.current.setMode("light"))
-    expect(meta.getAttribute("content")).toBe("#f7f6f2")
+    expect(meta.getAttribute("content")).toBe("#FFFFFF")
 
     meta.remove()
   })

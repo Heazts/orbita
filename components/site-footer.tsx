@@ -2,9 +2,10 @@
 
 import Link from "next/link"
 
-const CURRENT_YEAR = new Date().getFullYear()
-
 export function SiteFooter({ onOpenPreferences }: { onOpenPreferences: () => void }) {
+  // Computed at render time, not at module load time, so cached production
+  // builds always show the correct year after a year boundary.
+  const currentYear = new Date().getFullYear()
   return (
     <footer className="mt-4 border-t">
       <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 md:px-8 md:py-10">
@@ -19,6 +20,12 @@ export function SiteFooter({ onOpenPreferences }: { onOpenPreferences: () => voi
             </div>
           </div>
           <nav aria-label="Rodapé" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+            <Link
+              href="/estudantes"
+              className="font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Estudantes
+            </Link>
             <Link
               href="/jogos"
               className="font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -55,7 +62,7 @@ export function SiteFooter({ onOpenPreferences }: { onOpenPreferences: () => voi
           </nav>
         </div>
         <div className="flex flex-col justify-between gap-1 border-t pt-4 text-xs text-muted-foreground sm:flex-row sm:items-center">
-          <p className="font-medium">© {CURRENT_YEAR} Órbita Notícias</p>
+          <p className="font-medium">© {currentYear} Órbita Notícias</p>
           <p>Feito com feeds RSS públicos e Google News</p>
         </div>
       </div>
