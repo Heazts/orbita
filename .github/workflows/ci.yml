@@ -34,7 +34,5 @@ jobs:
         run: pnpm test:run
 
       - name: Security Scan (OSV-Scanner)
-        uses: google/osv-scanner-action@v1.9.1
-        with:
-          scan-args: '--config=.osv-scanner.toml .'
+        uses: google/osv-scanner-action@v2
         continue-on-error: true
