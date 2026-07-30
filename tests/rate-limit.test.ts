@@ -28,6 +28,17 @@ describe("clientIp", () => {
     expect(clientIp(headers({ "x-real-ip": "203.0.113.9", "x-forwarded-for": "1.1.1.1" }))).toBe("203.0.113.9")
   })
 
+  it("rejects malformed forwarding headers instead of using them as rate-limit keys", () => {
+    const client = clientIp(headers({ "x-real-ip": "attacker-controlled", "x-forwarded-for": "also-invalid" }))
+    expect(client).toMatch(/^unknown-/)
+  })
+
+  it("falls back to a valid proxy-appended address when x-real-ip is malformed", () => {
+    expect(clientIp(headers({ "x-real-ip": "invalid", "x-forwarded-for": "spoofed, 203.0.113.9" }))).toBe(
+      "203.0.113.9",
+    )
+  })
+
   it("returns a fresh unique key per call with no headers, instead of a fixed value", () => {
     // A fixed fallback would let unrelated clients share one rate-limit
     // bucket and lock each other out; a unique key per call avoids that.

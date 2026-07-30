@@ -139,7 +139,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const { buffer, contentType } = await fetchWithSafeRedirects(urlParam)
-    return new NextResponse(buffer, {
+    // NextResponse's BodyInit type accepts a web Uint8Array, while Node's
+    // Buffer may be backed by a SharedArrayBuffer under newer @types/node.
+    return new NextResponse(Uint8Array.from(buffer), {
       status: 200,
       headers: {
         "Content-Type": contentType,

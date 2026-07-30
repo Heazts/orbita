@@ -79,6 +79,10 @@ const jsonLd = {
   },
 }
 
+// JSON inside a <script> still participates in HTML parsing. Escaping "<"
+// prevents a deployment-time value from terminating the script with </script>.
+const serializedJsonLd = JSON.stringify(jsonLd).replace(/</g, "\\u003c")
+
 export const viewport: Viewport = {
   colorScheme: "light dark",
   themeColor: [
@@ -102,7 +106,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             mismatch — expected and harmless here, not an actual difference to
             patch up. */}
         <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('orbita-theme');var d=t==='dark'||((!t||t==='system')&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.add(d?'dark':'light')}catch(e){document.documentElement.classList.add('light')}})()` }} />
-        <script nonce={nonce} suppressHydrationWarning type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        <script nonce={nonce} suppressHydrationWarning type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializedJsonLd }} />
       </head>
       <body className="font-sans antialiased">
         <ErrorBoundary>

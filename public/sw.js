@@ -25,7 +25,10 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          if (response.ok && response.type === "basic") {
+          // Only persist the known shell route without a query string. Search
+          // URLs are unbounded and would otherwise let arbitrary navigations
+          // consume the browser's cache quota.
+          if (response.ok && response.type === "basic" && SHELL_PATHS.has(url.pathname) && !url.search) {
             const copy = response.clone()
             caches.open(CACHE).then((cache) => cache.put(request, copy))
           }

@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, RefreshCw } from "lucide-react"
+import { Check } from "lucide-react"
 
 // Transient confirmation ("Link copiado").
 export function NoticeBanner({ notice }: { notice: string }) {
