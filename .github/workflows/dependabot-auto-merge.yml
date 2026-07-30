@@ -1,6 +1,6 @@
 name: Dependabot auto-merge
 
-# Auto-merges Dependabot PRs for patch and minor updates once required checks
+# Auto-merges Dependabot PRs for patch updates once required checks
 # pass. Requires "Allow auto-merge" enabled in Settings and a branch
 # protection rule on main that requires the CI checks — without it, GitHub has
 # nothing to gate the merge on. Major updates are always left for manual review.
@@ -20,8 +20,8 @@ jobs:
         id: meta
         uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2.5.0
 
-      - name: Enable auto-merge for patch/minor updates
-        if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
+      - name: Enable auto-merge for patch updates
+        if: steps.meta.outputs.update-type == 'version-update:semver-patch'
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}

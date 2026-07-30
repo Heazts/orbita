@@ -1,21 +1,22 @@
 import { NextRequest, NextResponse } from "next/server"
 import { aggregateNews, DEFAULT_NEWS_QUERY } from "@/lib/aggregate"
+import { validBearerToken } from "@/lib/cron-auth"
 
+export const runtime = "nodejs"
 export const revalidate = 0
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization")
   const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret) {
+    return NextResponse.json({ success: false, error: "Cron não configurado" }, { status: 503 })
+  }
 
-  // Secure cron endpoint if secret is configured
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!validBearerToken(request.headers.get("authorization"), cronSecret)) {
     return new NextResponse("Não autorizado", { status: 401 })
   }
 
   try {
-    // Warm default homepage news cache
     const result = await aggregateNews(DEFAULT_NEWS_QUERY)
-
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
@@ -23,8 +24,8 @@ export async function GET(request: NextRequest) {
       sourceCount: result.sourceCount,
       failedSources: result.failedSources ?? [],
     })
-  } catch (err) {
-    const error = err instanceof Error ? err.message : "Erro desconhecido"
-    return NextResponse.json({ success: false, error }, { status: 500 })
+  } catch (error) {
+    console.error("[cron-ingest] failed", error instanceof Error ? error.name : "UnknownError")
+    return NextResponse.json({ success: false, error: "Falha ao atualizar o cache" }, { status: 500 })
   }
 }

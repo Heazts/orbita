@@ -21,11 +21,14 @@ possível para responder rapidamente.
   `Referrer-Policy`, `Permissions-Policy`) aplicados a todas as rotas.
 - CSP baseada em nonce, com relato de violações (`report-to` +
   `Reporting-Endpoints`) recebido em `/api/csp-report`.
-- A API `/api/news` só busca em uma lista fixa de feeds e no Google News; a
-  entrada do usuário nunca vira um host/URL arbitrário (sem SSRF).
+- A API `/api/news` só busca em uma lista fixa de feeds e no Google News. O
+  proxy de imagens valida DNS, bloqueia redes privadas/reservadas, limita
+  redirecionamentos e tamanho de resposta para reduzir SSRF e abuso de memória.
 - Conteúdo de feeds é renderizado como texto pelo React (sem `dangerouslySetInnerHTML`).
 - Rate limiting na API: por instância (em memória) por padrão, ou distribuído
   entre instâncias via Upstash Redis quando `UPSTASH_REDIS_REST_URL` e
   `UPSTASH_REDIS_REST_TOKEN` estão configurados (veja `.env.example`).
 - `/.well-known/security.txt` (RFC 9116) aponta para este processo de divulgação.
+- O endpoint de cron exige `CRON_SECRET` e falha de forma segura quando o
+  segredo não está configurado.
 - Dependências monitoradas por Dependabot e código analisado por CodeQL.

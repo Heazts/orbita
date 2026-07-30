@@ -1,5 +1,6 @@
-const CACHE = "orbita-v1"
+const CACHE = "orbita-v2"
 const SHELL = ["/", "/icon-192.png", "/icon-512.png", "/manifest.webmanifest"]
+const SHELL_PATHS = new Set(SHELL)
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()))
@@ -16,18 +17,18 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event
   if (request.method !== "GET") return
-  const url = new URL(request.url)
-  if (url.origin !== self.location.origin) return
-  // Never cache the news API — it must always be fresh.
-  if (url.pathname.startsWith("/api/")) return
 
-  // Navigations: network-first, fall back to the cached shell when offline.
+  const url = new URL(request.url)
+  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return
+
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone()
-          caches.open(CACHE).then((cache) => cache.put(request, copy))
+          if (response.ok && response.type === "basic") {
+            const copy = response.clone()
+            caches.open(CACHE).then((cache) => cache.put(request, copy))
+          }
           return response
         })
         .catch(() => caches.match(request).then((cached) => cached || caches.match("/"))),
@@ -35,7 +36,12 @@ self.addEventListener("fetch", (event) => {
     return
   }
 
-  // Static assets: cache-first.
+  // Cache only the known PWA shell and immutable Next.js build assets. Caching
+  // every same-origin GET lets arbitrary query strings consume the browser's
+  // cache quota and can preserve responses that were never intended offline.
+  const cacheable = SHELL_PATHS.has(url.pathname) || url.pathname.startsWith("/_next/static/")
+  if (!cacheable) return
+
   event.respondWith(
     caches.match(request).then((cached) =>
       cached ||
