@@ -43,7 +43,6 @@ export function Ticker({ items, isLive }: TickerProps) {
           <div
             className="ticker-track-vertical flex flex-col text-xs font-bold uppercase tracking-wider"
             aria-hidden="true"
-            style={paused ? { animationPlayState: "paused" } : undefined}
           >
             {[...displayItems, ...displayItems].map((item, index) => (
               <a
