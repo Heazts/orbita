@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import type { NewsItem } from "@/lib/news"
-import { ExternalLink, Layers, ShieldCheck, Users, X } from "lucide-react"
+import { ExternalLink, ShieldCheck, Users, X } from "lucide-react"
 
 type SourcesModalProps = {
   item: NewsItem

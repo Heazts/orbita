@@ -7,17 +7,14 @@ import { Activity, Minus, TrendingDown, TrendingUp } from "lucide-react"
 const TREND_STYLES = {
   up: {
     Icon: TrendingUp,
-    textClass: "text-emerald-600 dark:text-emerald-400",
     badgeClass: "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400",
   },
   down: {
     Icon: TrendingDown,
-    textClass: "text-rose-600 dark:text-rose-400",
     badgeClass: "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400",
   },
   flat: {
     Icon: Minus,
-    textClass: "text-muted-foreground",
     badgeClass: "bg-muted border-border text-muted-foreground",
   },
 } as const
@@ -64,7 +61,7 @@ export function FinancialTicker() {
       ) : (
         <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
           {indicators.map((item) => {
-            const { Icon, textClass, badgeClass } = TREND_STYLES[item.trend]
+            const { Icon, badgeClass } = TREND_STYLES[item.trend]
             return (
               <li
                 key={item.symbol}

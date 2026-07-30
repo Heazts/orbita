@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server"
+import { isIP } from "node:net"
 
 // Best-effort per-instance rate limiting against casual abuse. Not a hard
 // guarantee across instances on its own — configure the Upstash Redis env vars
@@ -7,18 +8,28 @@ export const RATE_LIMIT_WINDOW_MS = 60_000
 export const RATE_LIMIT_MAX_REQUESTS = 30
 
 const requestLog = new Map<string, number[]>()
+const MAX_TRACKED_CLIENTS = 10_000
+let lastCleanupAt = 0
+
+function normalizedIp(value: string | null): string | null {
+  const candidate = value?.trim()
+  // IPv6 textual representations fit within 45 characters. Rejecting anything
+  // else also keeps attacker-controlled forwarding headers out of Redis keys.
+  return candidate && candidate.length <= 45 && isIP(candidate) ? candidate : null
+}
 
 // x-real-ip is set by the edge proxy from the actual TCP connection and can't be
 // spoofed by the client. x-forwarded-for can have attacker-supplied entries
 // prepended, but the proxy appends the real client IP as the *last* entry — so
 // that's the one to trust, never the first.
 export function clientIp(request: Pick<NextRequest, "headers">): string {
-  const realIp = request.headers.get("x-real-ip")
-  if (realIp) return realIp.trim()
+  const realIp = normalizedIp(request.headers.get("x-real-ip"))
+  if (realIp) return realIp
   const forwarded = request.headers.get("x-forwarded-for")
   if (forwarded) {
     const ips = forwarded.split(",").map((ip) => ip.trim()).filter(Boolean)
-    if (ips.length) return ips[ips.length - 1]
+    const proxyAppendedIp = normalizedIp(ips.at(-1) ?? null)
+    if (proxyAppendedIp) return proxyAppendedIp
   }
   // No IP-identifying header at all — shouldn't happen behind Vercel's proxy,
   // which always sets x-forwarded-for, but could on another host without one.
@@ -45,8 +56,30 @@ export function checkRateLimit(clientId: string, now: number = Date.now()): Rate
   if (clientId.startsWith("unknown-")) {
     return { limited: false, remaining: RATE_LIMIT_MAX_REQUESTS - 1, retryAfterSeconds: 0 }
   }
+
+  // Remove expired buckets periodically and cap the map even within a single
+  // window. Without both guards, a stream of unique client addresses could
+  // make a long-lived Node instance retain entries indefinitely.
+  if (now - lastCleanupAt >= RATE_LIMIT_WINDOW_MS) {
+    for (const [key, timestamps] of requestLog) {
+      if (!timestamps.length || now - timestamps[timestamps.length - 1] >= RATE_LIMIT_WINDOW_MS) {
+        requestLog.delete(key)
+      }
+    }
+    lastCleanupAt = now
+  }
+
+  const knownClient = requestLog.has(clientId)
+  if (!knownClient && requestLog.size >= MAX_TRACKED_CLIENTS) {
+    const oldestClient = requestLog.keys().next().value
+    if (oldestClient !== undefined) requestLog.delete(oldestClient)
+  }
+
   const recent = (requestLog.get(clientId) ?? []).filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS)
   recent.push(now)
+  // Refresh insertion order so the bounded map evicts the least recently seen
+  // client when it reaches capacity.
+  if (knownClient) requestLog.delete(clientId)
   requestLog.set(clientId, recent)
   const limited = recent.length > RATE_LIMIT_MAX_REQUESTS
   const remaining = Math.max(0, RATE_LIMIT_MAX_REQUESTS - recent.length)
@@ -61,6 +94,7 @@ export function isRateLimited(clientId: string, now: number = Date.now()): boole
 // Exposed for tests so state doesn't leak between cases.
 export function resetRateLimit(): void {
   requestLog.clear()
+  lastCleanupAt = 0
 }
 
 // --- Distributed rate limiting (optional) --------------------------------
