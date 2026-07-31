@@ -21,63 +21,74 @@ import { fileURLToPath } from "node:url"
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const PUBLIC = join(ROOT, "public")
 
-// 32x32 authoring grid — an astronaut bust.
-//   "." transparent · "#" suit/helmet (foreground) · "o" visor and chest panel (accent)
+// 32x32 authoring grid — a full-body astronaut.
 //
-// Authored at 32, not 16. A character needs a helmet, a neck and shoulders to
-// read as a person, and 16 cells cannot hold all three legibly — the first
-// attempt at this mark was drawn at 16 and came out looking like an eye. 32
-// still divides evenly into every size shipped (32/32=1, 192/32=6, 512/32=16),
-// so cells stay on whole pixels.
+// The artwork is the maintainer's, supplied as an SVG and rasterised onto this
+// grid by painting its rects in document order (scripts note: outline shapes
+// are drawn first and covered by fills, so order matters). Keeping it as a grid
+// rather than checking the SVG in directly is what lets one source produce the
+// favicon, the PWA icons, the maskable variant and the monochrome fallback
+// without any of them drifting.
 //
-// Two decisions carry the whole read, both of them found by rendering and
-// looking rather than by reasoning:
-//
-// 1. The visor is a window in the *lower* half of the dome, with four rows of
-//    shell above it. An earlier draft let the visor fill nearly the whole
-//    helmet; with no dome left, the silhouette stopped being a helmet.
-//
-// 2. The shoulder profile is per-row and deliberately not a smooth ramp.
-//    Interpolating linearly from neck width to base width produces a cone,
-//    which reads as a chess pawn. Real shoulders flare fast and then drop
-//    almost vertically, and that change of angle is what the eye recognises.
-//
-// Regenerate assets after editing with `pnpm icons`; tests/icons.test.ts
-// rebuilds the inline component's tables from this grid and fails on drift.
+// Letters are assigned per distinct colour in order of first appearance; see
+// PALETTE below. Regenerate assets after editing with `pnpm icons`.
 const GRID = [
   "................................",
-  "............########............",
-  "..........############..........",
-  ".........##############.........",
-  ".........##############.........",
-  "........################........",
-  "........################........",
-  ".......##################.......",
-  ".......##################.......",
-  ".......#####oooooooo#####.......",
-  ".......####oooooooooo####.......",
-  ".......###oooooooooooo###.......",
-  ".......##oooooooooooooo##.......",
-  "........#oooooooooooooo#........",
-  "........##oooooooooooo##........",
-  ".........##oooooooooo##.........",
-  ".........###oooooooo###.........",
-  "..........############..........",
-  "............########............",
-  ".............######.............",
-  ".............######.............",
-  ".........##############.........",
-  "......####################......",
-  "....########################....",
-  "...##########################...",
-  "...##########################...",
-  "...###########oooo###########...",
-  "...##########oooooo##########...",
-  "..###########oooooo###########..",
-  "..############oooo############..",
-  "..############################..",
-  "..############################..",
+  "................................",
+  "..........AAAAAAAAAAAA..........",
+  "..........BBBBBBBBBBBB..........",
+  ".......AAABBBBBBBBBBBBAAA.......",
+  ".......ACCCCCCCCCCCCCCCCA.......",
+  ".....AAACCCCCCCCCCCCCCCCAAA.....",
+  ".....AADAAAAAAAAAAAAAAAADAA.....",
+  ".....EEDAFFFFGGFFFFFFFFADEE.....",
+  ".....EEDAFHIIFFFFFFFFFFADEE.....",
+  ".....EEDAFIIIFFFFFFFFFFADEE.....",
+  ".....EEDAFFFFFFFFFFFFFFADEE.....",
+  ".....EEDAFFFFFFFFFFFFJFADEE.....",
+  ".....EEDAFFFFFFFFFFFFFFADEE.....",
+  ".....AADAAAAAAAAAAAAAAAADAA.....",
+  ".....AAABBBBBBBBBBBBBBBBAAA.....",
+  ".......ABBBBBBBBBBBBBBBBA.......",
+  ".......AAAAAAAAAAAAAAAAAA.......",
+  ".......AAAAAAAAAAAAAAAAAA.......",
+  "........AKKKKKKKKKKKKKKA........",
+  "......AAAKKLLLLLLLLLLKKAAA......",
+  "......ADDKKLMMNNLOOOLKKDDA......",
+  "......ADDKKLMMNNLLLLLKKDDA......",
+  "......ADDKKLLLLLLLLLLKKDDA......",
+  "......ADDKKKKKKKKKKKKKKDDA......",
+  "......ADDEEEEEEBBEEEEEEDDA......",
+  "......AAAEEEEEEBBEEEEEEAAA......",
+  "........AAOOOOOAAOOOOOAA........",
+  "........AAOOOOOAAOOOOOAA........",
+  ".........GGGGGG..GGGGGG.........",
+  "................................",
+  "................................",
 ]
+
+// Fixed palette. Unlike the abstract mark this replaced, a character does not
+// invert between themes — a mascot rendered in negative reads as a different
+// character — so the palette holds on white, on near-black and on mid greys,
+// and the dark outline is what guarantees the silhouette survives on any of
+// them.
+const PALETTE = {
+  A: "#07112f",
+  B: "#dcebfa",
+  C: "#b9d1e8",
+  D: "#9db9d7",
+  E: "#516c96",
+  F: "#020817",
+  G: "#304a78",
+  H: "#ffffff",
+  I: "#3db7f2",
+  J: "#526f9d",
+  K: "#c9ddf0",
+  L: "#7895bb",
+  M: "#e32636",
+  N: "#249be5",
+  O: "#afc8df",
+}
 
 const CELLS = GRID.length
 
@@ -163,7 +174,7 @@ const hexToRgba = (hex, alpha = 255) => {
  * some places and kept it in others. Drawing straight at the target cell size
  * avoids the resample entirely.
  */
-function render({ size, suit, visor, background, cellSize = size / CELLS }) {
+function render({ size, background, cellSize = size / CELLS }) {
   if (!Number.isInteger(cellSize)) {
     throw new Error(`cellSize ${cellSize} must be a whole number of pixels`)
   }
@@ -174,8 +185,9 @@ function render({ size, suit, visor, background, cellSize = size / CELLS }) {
 
   const rgba = Buffer.alloc(size * size * 4)
   const bg = background ? hexToRgba(background) : [0, 0, 0, 0]
-  const suitColor = hexToRgba(suit)
-  const visorColor = hexToRgba(visor)
+  const colors = Object.fromEntries(
+    Object.entries(PALETTE).map(([key, hex]) => [key, hexToRgba(hex)]),
+  )
 
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
@@ -184,9 +196,7 @@ function render({ size, suit, visor, background, cellSize = size / CELLS }) {
       const inside = cellY >= 0 && cellY < CELLS && cellX >= 0 && cellX < CELLS
       const cell = inside ? GRID[cellY][cellX] : "."
 
-      let color = bg
-      if (cell === "#") color = suitColor
-      else if (cell === "o") color = visorColor
+      const color = colors[cell] ?? bg
 
       const offset = (y * size + x) * 4
       rgba[offset] = color[0]
@@ -199,19 +209,47 @@ function render({ size, suit, visor, background, cellSize = size / CELLS }) {
   return encodePng(size, size, rgba)
 }
 
-/** SVG built from the same grid, one <rect> per filled cell. */
-function renderSvg({ suit, visor, background, monochrome = false }) {
+/**
+ * SVG built from the same grid, one <rect> per filled cell.
+ *
+ * `monochrome` collapses the palette onto currentColor at three opacity steps,
+ * for surfaces that must adopt the surrounding text colour. It is a fallback,
+ * not the primary form: the colour sprite is what ships.
+ */
+function renderSvg({ background, monochrome = false }) {
+  // Opacity derived from each colour's luminance, so the monochrome variant
+  // preserves the artwork's own light-to-dark structure instead of relying on
+  // a hand-kept table that silently rots when the palette changes.
+  const MONO_OPACITY = Object.fromEntries(
+    Object.entries(PALETTE).map(([key, hex]) => {
+      const [r, g, b] = hexToRgba(hex)
+      const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+      // Dark cells (outline, visor) stay opaque; light cells fade back.
+      return [key, Number((1 - luminance * 0.7).toFixed(2))]
+    }),
+  )
   const rects = []
   if (background) {
     rects.push(`<rect width="${CELLS}" height="${CELLS}" fill="${background}"/>`)
   }
+  // Horizontal run-length merging. One <rect> per cell produced a 33 KB file
+  // for a 32x32 sprite — most of it repeated coordinates for neighbouring cells
+  // of the same colour. Merging each run of identical cells in a row into a
+  // single wider rect cuts that by roughly four fifths with identical output.
   for (let y = 0; y < CELLS; y += 1) {
-    for (let x = 0; x < CELLS; x += 1) {
+    let x = 0
+    while (x < CELLS) {
       const cell = GRID[y][x]
-      if (cell === ".") continue
-      const fill = monochrome ? "currentColor" : cell === "#" ? suit : visor
-      const opacity = monochrome && cell === "o" ? ' opacity="0.65"' : ""
-      rects.push(`<rect x="${x}" y="${y}" width="1" height="1" fill="${fill}"${opacity}/>`)
+      if (cell === ".") {
+        x += 1
+        continue
+      }
+      let run = 1
+      while (x + run < CELLS && GRID[y][x + run] === cell) run += 1
+      const fill = monochrome ? "currentColor" : PALETTE[cell]
+      const opacity = monochrome ? ` opacity="${MONO_OPACITY[cell]}"` : ""
+      rects.push(`<rect x="${x}" y="${y}" width="${run}" height="1" fill="${fill}"${opacity}/>`)
+      x += run
     }
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${CELLS} ${CELLS}" width="${CELLS}" height="${CELLS}" shape-rendering="crispEdges" role="img" aria-label="Órbita">
@@ -220,29 +258,24 @@ ${rects.map((r) => `  ${r}`).join("\n")}
 `
 }
 
-// Palette drawn from the design tokens in app/globals.css.
 const INK = "#111111"
-const PAPER = "#ffffff"
-const ACCENT_ON_LIGHT = "#1d4ed8"
-const ACCENT_ON_DARK = "#7aa7ff"
 
 const outputs = [
-  // Favicons. 16px is one pixel per cell — the size the grid was drawn for.
-  ["icon-light-32x32.png", render({ size: 32, suit: INK, visor: ACCENT_ON_LIGHT })],
-  ["icon-dark-32x32.png", render({ size: 32, suit: PAPER, visor: ACCENT_ON_DARK })],
+  // The same sprite in both slots: the mascot does not invert between themes.
+  // Both filenames are kept because app/layout.tsx references them from
+  // media-scoped <link> tags.
+  ["icon-light-32x32.png", render({ size: 32 })],
+  ["icon-dark-32x32.png", render({ size: 32 })],
   // PWA / app icons need an opaque background: transparent PNGs render on an
   // unpredictable colour in launchers and on iOS.
-  ["icon-192.png", render({ size: 192, suit: PAPER, visor: ACCENT_ON_DARK, background: INK })],
-  ["icon-512.png", render({ size: 512, suit: PAPER, visor: ACCENT_ON_DARK, background: INK })],
+  ["icon-192.png", render({ size: 192, background: INK })],
+  ["icon-512.png", render({ size: 512, background: INK })],
   // Maskable: Android crops to an arbitrary shape, so the art has to sit
-  // inside a safe zone. 28px cells give 448px of art on a 512px canvas — 87.5%,
-  // comfortably inside the 80% circle the spec guarantees — with a whole-pixel
-  // 32px margin on each side.
-  [
-    "icon-maskable-512.png",
-    render({ size: 512, cellSize: 14, suit: PAPER, visor: ACCENT_ON_DARK, background: INK }),
-  ],
-  ["apple-icon.png", render({ size: 192, suit: PAPER, visor: ACCENT_ON_DARK, background: INK })],
+  // inside a safe zone. 14px cells give 448px of art on a 512px canvas —
+  // 87.5%, comfortably inside the 80% circle the spec guarantees — with a
+  // whole-pixel 32px margin on each side.
+  ["icon-maskable-512.png", render({ size: 512, cellSize: 14, background: INK })],
+  ["apple-icon.png", render({ size: 192, background: INK })],
 ]
 
 await mkdir(PUBLIC, { recursive: true })
@@ -253,6 +286,6 @@ for (const [name, buffer] of outputs) {
 
 // The header mark uses currentColor so it inherits the surrounding text colour
 // and therefore works on any surface, in either theme, and in forced-colors.
-await writeFile(join(PUBLIC, "icon.svg"), renderSvg({ suit: INK, visor: ACCENT_ON_LIGHT }))
+await writeFile(join(PUBLIC, "icon.svg"), renderSvg({}))
 await writeFile(join(PUBLIC, "icon-mono.svg"), renderSvg({ monochrome: true }))
 console.log("icon.svg, icon-mono.svg")

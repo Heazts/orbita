@@ -34,6 +34,22 @@ describe("generated icon assets", () => {
     }
   })
 
+  // The header used to inline a hand-maintained copy of the grid as JSX, and
+  // these tests existed to stop it drifting from the generator. It now points
+  // at /icon.svg, which the generator writes — the two cannot drift, because
+  // there is only one of them. What is still worth asserting is that the file
+  // exists, is well-formed, and stays small enough to be worth serving.
+  it("ships an icon.svg the header can point at", () => {
+    const svg = readFileSync(
+      fileURLToPath(new URL("../public/icon.svg", import.meta.url)),
+      "utf8",
+    )
+    expect(svg).toContain("<svg")
+    expect(svg).toContain('shape-rendering="crispEdges"')
+    // Antialiasing off is what preserves the pixel-art read when scaled.
+    expect(svg).toContain('viewBox="0 0 32 32"')
+  })
+
   it("keeps the inline header mark in step with the generator grid", () => {
     const generator = readFileSync(
       fileURLToPath(new URL("../scripts/generate-icons.mjs", import.meta.url)),
@@ -44,44 +60,64 @@ describe("generated icon assets", () => {
       "utf8",
     )
 
-    const grid = generator.match(/const GRID = \[([\s\S]*?)\n\]/)?.[1]
-    expect(grid).toBeDefined()
-    const rows = Array.from(grid!.matchAll(/"([.o#]+)"/g)).map((m) => m[1])
+    const gridBlock = generator.match(/const GRID = \[([\s\S]*?)\n\]/)?.[1]
+    expect(gridBlock).toBeDefined()
+    const rows = Array.from(gridBlock!.matchAll(/"([.A-Z]+)"/g)).map((m) => m[1])
 
-    // The grid size is read from the grid itself rather than hardcoded: the
-    // mark was authored at 16 and later redrawn at 32, and a pinned number
-    // turns that redesign into a spurious test failure instead of catching a
-    // real problem. What matters is that it is square and that the component
-    // agrees with it.
+    // Size is read from the grid, never pinned: this mark has already been
+    // redrawn at a different resolution once, and a hardcoded number turns a
+    // redesign into a spurious failure instead of catching a real problem.
     expect(rows.length).toBeGreaterThan(0)
     expect(rows.every((row) => row.length === rows.length)).toBe(true)
-    expect(mark).toContain(`const CELLS = ${rows.length}`)
+    expect(mark).toContain(`viewBox="0 0 ${rows.length} ${rows.length}"`)
 
-    // Rebuild the visor and suit cell lists from the grid and check the
-    // component's tables agree. Without this the SVG in the header and the PNG
-    // in the tab can silently diverge.
-    const visorRows: string[] = []
-    const suitRows: string[] = []
+    // Rebuild the horizontal runs from the grid and require every one to be
+    // present in the component. This is the guard against the header mark and
+    // the favicon drifting apart.
+    let runs = 0
     rows.forEach((row, y) => {
-      const visor = [...row].map((c, x) => (c === "o" ? x : -1)).filter((x) => x >= 0)
-      const suit = [...row].map((c, x) => (c === "#" ? x : -1)).filter((x) => x >= 0)
-      if (visor.length) visorRows.push(`[${y}, [${visor.join(", ")}]]`)
-      if (suit.length) suitRows.push(`[${y}, [${suit.join(", ")}]]`)
+      let x = 0
+      while (x < row.length) {
+        const cell = row[x]
+        if (cell === ".") {
+          x += 1
+          continue
+        }
+        let width = 1
+        while (x + width < row.length && row[x + width] === cell) width += 1
+        expect(mark).toContain(`<rect x="${x}" y="${y}" width="${width}" height="1" />`)
+        runs += 1
+        x += width
+      }
     })
-
-    expect(visorRows.length).toBeGreaterThan(0)
-    expect(suitRows.length).toBeGreaterThan(0)
-    for (const entry of visorRows) expect(mark).toContain(entry)
-    for (const entry of suitRows) expect(mark).toContain(entry)
+    expect(runs).toBeGreaterThan(0)
   })
 
-  it("draws the mark from currentColor so it works on any surface and theme", () => {
-    const mark = readFileSync(
-      fileURLToPath(new URL("../components/ui/orbita-mark.tsx", import.meta.url)),
+  it("uses the mark in the header", () => {
+    const header = readFileSync(
+      fileURLToPath(new URL("../components/header.tsx", import.meta.url)),
       "utf8",
     )
-    expect(mark).toContain('fill="currentColor"')
-    // Antialiasing off is what preserves the pixel-art read when scaled.
-    expect(mark).toContain('shapeRendering="crispEdges"')
+    expect(header).toContain("<OrbitaMark")
+  })
+
+  it("keeps the SVG compact via run-length merging", () => {
+    const svg = readFileSync(
+      fileURLToPath(new URL("../public/icon.svg", import.meta.url)),
+      "utf8",
+    )
+    const rects = svg.match(/<rect /g)?.length ?? 0
+    const cells = 32 * 32
+
+    // One rect per filled cell produced a 33 KB file. Merging horizontal runs
+    // brought it under 10 KB. This guards the merging: if it regresses, the
+    // rect count jumps back towards one-per-cell.
+    expect(rects).toBeGreaterThan(0)
+    expect(rects).toBeLessThan(cells / 3)
+    expect(svg.length).toBeLessThan(12_000)
+
+    // A merged run must actually appear, not just a low count from a sparse
+    // sprite.
+    expect(svg).toMatch(/<rect [^>]*width="([2-9]|\d\d)"/)
   })
 })

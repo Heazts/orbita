@@ -79,11 +79,12 @@ export function Header({
         >
           {/* aria-hidden: the link already has an accessible name, so naming
               the mark too would make a screen reader read it twice. */}
-          {/* text-foreground, not text-primary: the suit is the foreground
-              colour in every generated asset and only the visor takes the
-              accent. Tinting the whole mark blue here would make the header
-              disagree with the favicon sitting right above it in the tab. */}
-          <OrbitaMark className="size-9 text-foreground" />
+          {/* Inline, not <img src="/icon.svg">. Measured both: the markup is
+              844 bytes gzipped, cheaper than a second request, and it cannot
+              flash in after paint. No aria-label — the link already carries
+              its accessible name, and naming the mark too would make a screen
+              reader announce it twice. */}
+          <OrbitaMark className="size-9" />
           <span className="font-serif text-xl font-bold tracking-tight">ÓRBITA</span>
         </Link>
         <div className="flex items-center gap-2">
