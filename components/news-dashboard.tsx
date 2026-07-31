@@ -113,9 +113,11 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [notice, setNotice] = useState("")
   const [newCount, setNewCount] = useState(0)
-  const [selectedSummaryItem, setSelectedAiItem] = useState<NewsItem | null>(null)
+  const [selectedSummaryItem, setSelectedSummaryItem] = useState<NewsItem | null>(null)
   const [selectedSourcesItem, setSelectedSourcesItem] = useState<NewsItem | null>(null)
-  const previousItemIds = useRef<string[]>([])
+  // The items array the new-headline count was last reconciled against. Held in
+  // state rather than a ref so the comparison can run during render.
+  const [trackedItems, setTrackedItems] = useState<NewsItem[] | undefined>(undefined)
 
   const fallbackItems = useMemo(
     () =>
@@ -166,16 +168,27 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
     keepPreviousData: true,
   })
 
-  useEffect(() => {
-    const currentIds = (data?.items ?? []).map((item) => item.id)
-    if (previousItemIds.current.length > 0 && currentIds.length > 0) {
-      const newItems = currentIds.filter((id) => !previousItemIds.current.includes(id))
-      if (newItems.length > 0) {
-        setNewCount((count) => count + newItems.length)
+  // Counting newly arrived headlines is a state adjustment driven by new data,
+  // which React's docs put *during render* rather than in an effect: an effect
+  // renders once with the stale count, commits, then renders again. Comparing
+  // here means the badge is correct on the first commit, and it satisfies
+  // react-hooks/set-state-in-effect honestly instead of by suppression.
+  //
+  // The lookup is a Set, not Array.includes. This runs on every refresh (every
+  // 30-45s) over up to 100 items, and the nested scan it replaces was 100x100
+  // comparisons for a result that is almost always zero.
+  if (data?.items !== trackedItems) {
+    const previousIds = new Set((trackedItems ?? []).map((item) => item.id))
+    const currentItems = data?.items ?? []
+    let added = 0
+    if (previousIds.size > 0) {
+      for (const item of currentItems) {
+        if (!previousIds.has(item.id)) added += 1
       }
     }
-    previousItemIds.current = currentIds
-  }, [data?.items])
+    setTrackedItems(data?.items)
+    if (added > 0) setNewCount((count) => count + added)
+  }
 
   useEffect(() => {
     if (newCount > 0) {
@@ -206,19 +219,41 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
   // header badge.
   const visibleNewCount = prefs.newAlerts ? newCount : 0
 
-  const share = useCallback(async (item: NewsItem) => {
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: item.title, url: item.url })
-      } else {
-        await navigator.clipboard.writeText(item.url)
-        setNotice("Link copiado")
-      }
-    } catch {
-      setNotice("Não foi possível compartilhar")
-    }
-    window.setTimeout(() => setNotice(""), 2500)
+  // Held so the pending dismissal can be cancelled. Without it, two shares
+  // inside 2.5s left two timers running and the first one cleared the second
+  // notice early; and a share immediately before navigating away set state on
+  // an unmounted component.
+  const noticeTimeout = useRef<number | undefined>(undefined)
+
+  const showNotice = useCallback((message: string) => {
+    window.clearTimeout(noticeTimeout.current)
+    setNotice(message)
+    noticeTimeout.current = window.setTimeout(() => setNotice(""), 2500)
   }, [])
+
+  useEffect(() => () => window.clearTimeout(noticeTimeout.current), [])
+
+  const share = useCallback(
+    async (item: NewsItem) => {
+      try {
+        if (navigator.share) {
+          await navigator.share({ title: item.title, url: item.url })
+          // Nothing to announce: the OS share sheet already gave feedback, and
+          // the previous code still started a timer here for an empty notice.
+          return
+        }
+        await navigator.clipboard.writeText(item.url)
+        showNotice("Link copiado")
+      } catch (error) {
+        // Dismissing the OS share sheet rejects with AbortError. That is the
+        // reader deciding not to share, not a failure, and telling them
+        // "Não foi possível compartilhar" blames them for their own choice.
+        if (error instanceof DOMException && error.name === "AbortError") return
+        showNotice("Não foi possível compartilhar")
+      }
+    },
+    [showNotice],
+  )
 
   const clear = useCallback(() => {
     setInput("")
@@ -345,7 +380,7 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
               favorites={favorites}
               onToggleFavorite={toggleFavorite}
               onShare={(item) => void share(item)}
-              onQuickSummary={setSelectedAiItem}
+              onQuickSummary={setSelectedSummaryItem}
               onShowSources={setSelectedSourcesItem}
             />
             <Sidebar onClear={clear} />
@@ -354,7 +389,7 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
       </main>
 
       {selectedSummaryItem && (
-        <QuickSummaryModal item={selectedSummaryItem} onClose={() => setSelectedAiItem(null)} />
+        <QuickSummaryModal item={selectedSummaryItem} onClose={() => setSelectedSummaryItem(null)} />
       )}
 
       {selectedSourcesItem && (

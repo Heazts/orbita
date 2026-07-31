@@ -41,8 +41,17 @@ function applyClass(theme: Theme): void {
   for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
     meta.setAttribute("content", THEME_COLOR[theme])
   }
-  window.setTimeout(() => root.classList.remove("theme-switching"), 200)
+  // Cancel any pending removal first. Toggling twice inside 200ms used to leave
+  // two timers running, and the first would strip `theme-switching` while the
+  // second flip was still mid-transition — reintroducing exactly the mixed
+  // old/new colour flash this class exists to prevent.
+  window.clearTimeout(themeSwitchTimeout)
+  themeSwitchTimeout = window.setTimeout(() => root.classList.remove("theme-switching"), 200)
 }
+
+// Module scope because applyTheme is a plain function shared by every caller,
+// not a hook with its own instance state.
+let themeSwitchTimeout: number | undefined
 
 // The boot script in app/layout.tsx applies the right class before hydration;
 // reading it back keeps the first client render consistent with the DOM.
