@@ -2,20 +2,19 @@
 
 import useSWR from "swr"
 import dynamic from "next/dynamic"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { Period, Sort } from "@/lib/types"
+import { useCallback, useMemo, useState } from "react"
 import { useFavorites } from "@/hooks/use-favorites"
 import { useNow } from "@/hooks/use-now"
 import { useSearchHistory } from "@/hooks/use-search-history"
-import { useDebouncedQuery } from "@/hooks/use-debounced-query"
 import { usePreferences } from "@/hooks/use-preferences"
 import { useTheme } from "@/hooks/use-theme"
-import { useUrlQuery } from "@/hooks/use-url-query"
+import { useNewsFilters } from "@/hooks/use-news-filters"
+import { useNewItemsCount } from "@/hooks/use-new-items-count"
+import { useNotice } from "@/hooks/use-notice"
 import {
   FALLBACK_NEWS,
   FEED_SOURCES,
   isHeavyTopic,
-  type NewsCategory,
   type NewsItem,
   type NewsResponse,
 } from "@/lib/news"
@@ -87,22 +86,6 @@ const SOURCE_OPTIONS = [
   ...FEED_SOURCES.map((source) => source.name).sort((a, b) => a.localeCompare(b, "pt-BR")),
 ]
 
-function buildApiUrl(query: string, category: NewsCategory, period: Period, sort: Sort, source: string): string {
-  const searchParams = new URLSearchParams()
-  if (query) searchParams.set("q", query)
-  if (category !== "Todas") searchParams.set("category", category)
-  if (period === "live") {
-    searchParams.set("period", "1")
-    searchParams.set("live", "true")
-  } else if (period !== "all") {
-    searchParams.set("period", period)
-  }
-  if (sort !== "latest") searchParams.set("sort", sort)
-  if (source !== "Todas") searchParams.set("source", source)
-  const queryString = searchParams.toString()
-  return `/api/news${queryString ? `?${queryString}` : ""}`
-}
-
 type NewsDashboardProps = {
   // Server-fetched default view (see app/page.tsx), used as SWR's fallbackData
   // so the first paint has real headlines instead of a skeleton — independent
@@ -118,24 +101,35 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
   const { theme, mode: themeMode, setMode: setThemeMode, toggleTheme } = useTheme()
   const { favorites, favoritesCount, toggleFavorite } = useFavorites()
   const { history, addTerm, clearHistory } = useSearchHistory()
-  const [input, setInput] = useState(() => {
-    if (typeof window === "undefined") return ""
-    return new URLSearchParams(window.location.search).get("q")?.trim() ?? ""
-  })
-  const [category, setCategory] = useState<NewsCategory>("Todas")
-  const [period, setPeriod] = useState<Period>("all")
-  const [sort, setSort] = useState<Sort>("latest")
-  const [source, setSource] = useState("Todas")
+  // Grouped into hooks by what they are for, rather than thirteen useState
+  // calls in a row with no indication of which belong together.
+  const filters = useNewsFilters(addTerm)
+  const {
+    input,
+    setInput,
+    category,
+    setCategory,
+    period,
+    setPeriod,
+    sort,
+    setSort,
+    source,
+    setSource,
+    favoritesOnly,
+    setFavoritesOnly,
+    query,
+    apiUrl,
+    isLivePeriod,
+    isDefaultView,
+    clear,
+  } = filters
+  const { notice, showNotice } = useNotice()
+
+  // Purely presentational: which panel or modal is open.
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [preferencesOpen, setPreferencesOpen] = useState(false)
-  const [favoritesOnly, setFavoritesOnly] = useState(false)
-  const [notice, setNotice] = useState("")
-  const [newCount, setNewCount] = useState(0)
   const [selectedSummaryItem, setSelectedSummaryItem] = useState<NewsItem | null>(null)
   const [selectedSourcesItem, setSelectedSourcesItem] = useState<NewsItem | null>(null)
-  // The items array the new-headline count was last reconciled against. Held in
-  // state rather than a ref so the comparison can run during render.
-  const [trackedItems, setTrackedItems] = useState<NewsItem[] | undefined>(undefined)
 
   const fallbackItems = useMemo(
     () =>
@@ -148,24 +142,8 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
     [now],
   )
 
-  const query = useDebouncedQuery(input, addTerm)
-  // Mirrors the active search in the address bar so it can be shared, and syncs
-  // the input back when the reader uses Back/Forward.
-  useUrlQuery(query, setInput)
 
-  const isLivePeriod = period === "live"
-  const apiUrl = useMemo(
-    () => buildApiUrl(query, category, period, sort, source),
-    [query, category, period, sort, source],
-  )
 
-  // Whether the reader is on the plain, unfiltered view apiUrl is built for
-  // (the only one the server pre-fetches). Deliberately not gated on
-  // `now !== null`: that gate previously meant fallbackData was only ever
-  // used post-hydration, so the server-rendered HTML (and the first client
-  // render, which must match it) always showed the loading skeleton instead
-  // of any fallback content.
-  const isDefaultView = !query && category === "Todas" && period === "all" && source === "Todas"
 
   // Prefer the server-fetched initialData (real data, valid even during SSR).
   // Only fall back to the synthetic FALLBACK_NEWS-with-fresh-dates once
@@ -186,35 +164,7 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
     keepPreviousData: true,
   })
 
-  // Counting newly arrived headlines is a state adjustment driven by new data,
-  // which React's docs put *during render* rather than in an effect: an effect
-  // renders once with the stale count, commits, then renders again. Comparing
-  // here means the badge is correct on the first commit, and it satisfies
-  // react-hooks/set-state-in-effect honestly instead of by suppression.
-  //
-  // The lookup is a Set, not Array.includes. This runs on every refresh (every
-  // 30-45s) over up to 100 items, and the nested scan it replaces was 100x100
-  // comparisons for a result that is almost always zero.
-  if (data?.items !== trackedItems) {
-    const previousIds = new Set((trackedItems ?? []).map((item) => item.id))
-    const currentItems = data?.items ?? []
-    let added = 0
-    if (previousIds.size > 0) {
-      for (const item of currentItems) {
-        if (!previousIds.has(item.id)) added += 1
-      }
-    }
-    setTrackedItems(data?.items)
-    if (added > 0) setNewCount((count) => count + added)
-  }
-
-  useEffect(() => {
-    if (newCount > 0) {
-      const timeout = setTimeout(() => setNewCount(0), 10_000)
-      return () => clearTimeout(timeout)
-    }
-    return undefined
-  }, [newCount])
+  const { newCount, resetCount } = useNewItemsCount(data?.items)
 
   const tickerItems = useMemo(() => (data?.items ?? []).slice(0, 12), [data?.items])
 
@@ -237,19 +187,6 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
   // header badge.
   const visibleNewCount = prefs.newAlerts ? newCount : 0
 
-  // Held so the pending dismissal can be cancelled. Without it, two shares
-  // inside 2.5s left two timers running and the first one cleared the second
-  // notice early; and a share immediately before navigating away set state on
-  // an unmounted component.
-  const noticeTimeout = useRef<number | undefined>(undefined)
-
-  const showNotice = useCallback((message: string) => {
-    window.clearTimeout(noticeTimeout.current)
-    setNotice(message)
-    noticeTimeout.current = window.setTimeout(() => setNotice(""), 2500)
-  }, [])
-
-  useEffect(() => () => window.clearTimeout(noticeTimeout.current), [])
 
   const share = useCallback(
     async (item: NewsItem) => {
@@ -273,14 +210,6 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
     [showNotice],
   )
 
-  const clear = useCallback(() => {
-    setInput("")
-    setCategory("Todas")
-    setPeriod("all")
-    setSort("latest")
-    setSource("Todas")
-    setFavoritesOnly(false)
-  }, [])
 
   const openPreferences = useCallback(() => {
     setPreferencesOpen(true)
@@ -301,7 +230,7 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
         hasData={Boolean(data?.items?.length)}
         newCount={visibleNewCount}
         isLive={isLivePeriod}
-        onRefresh={() => { setNewCount(0); void mutate() }}
+        onRefresh={() => { resetCount(); void mutate() }}
         preferencesOpen={preferencesOpen}
         onPreferencesToggle={() => setPreferencesOpen((open) => !open)}
         theme={theme}
