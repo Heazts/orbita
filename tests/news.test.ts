@@ -41,6 +41,21 @@ describe("plainText", () => {
     expect(plainText("&lt;p&gt;Texto importante&lt;/p&gt;")).toBe("Texto importante")
   })
 
+  it("removes script and style contents, including spaced closing tags", () => {
+    expect(
+      plainText("<script>alert('x')</script ><style>body{display:none}</style ><p>Texto seguro</p>"),
+    ).toBe("Texto seguro")
+  })
+
+  it("removes scripts that arrive double-encoded by a feed", () => {
+    expect(plainText("&lt;script&gt;alert(1)&lt;/script &gt;&lt;p&gt;Visível&lt;/p&gt;")).toBe("Visível")
+  })
+
+  it("handles many script tags in linear time without leaking their contents", () => {
+    const hostile = `${"<script>x</script >".repeat(10_000)}Conteúdo final`
+    expect(plainText(hostile)).toBe("Conteúdo final")
+  })
+
   it("strips a leaked \"[object Object]\" artifact from feed text (Globo/GE case)", () => {
     expect(plainText("[object Object]Carpini, em coletiva")).toBe("Carpini, em coletiva")
     expect(plainText("Antes [object Object] depois")).toBe("Antes depois")

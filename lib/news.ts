@@ -294,16 +294,96 @@ const LEAKED_ATTR_REGEX =
 const BOILERPLATE_REGEX =
   /\s*(?:(?:clique|acesse|saiba|leia|confira|veja|assista|ouça)\s+(?:aqui|mais|na íntegra|no site|o vídeo|o áudio|a matéria|a reportagem)|leia mais|saiba mais|confira|veja mais|matéria completa|notícia completa|foto:|\[\+\]|\.\.\.)\s*\.?$/gi
 
+type HtmlTag = {
+  name: string
+  closing: boolean
+  selfClosing: boolean
+}
+
+function isHtmlWhitespace(char: string): boolean {
+  return char === " " || char === "\t" || char === "\n" || char === "\r" || char === "\f"
+}
+
+function htmlTag(value: string): HtmlTag | null {
+  let index = 0
+  while (index < value.length && isHtmlWhitespace(value[index])) index += 1
+
+  const closing = value[index] === "/"
+  if (closing) {
+    index += 1
+    while (index < value.length && isHtmlWhitespace(value[index])) index += 1
+  }
+
+  const nameStart = index
+  while (index < value.length) {
+    const code = value.charCodeAt(index)
+    const isLetter = (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
+    const isDigit = code >= 48 && code <= 57
+    if (!isLetter && !isDigit && value[index] !== ":" && value[index] !== "-") break
+    index += 1
+  }
+  if (index === nameStart) return null
+
+  let end = value.length - 1
+  while (end >= index && isHtmlWhitespace(value[end])) end -= 1
+  return {
+    name: value.slice(nameStart, index).toLowerCase(),
+    closing,
+    selfClosing: value[end] === "/",
+  }
+}
+
+// Linear markup removal for external feed content. Regex-based HTML filtering
+// is both incomplete for malformed-but-browser-valid tags and vulnerable to
+// pathological backtracking on large attacker-controlled descriptions.
+function stripHtmlMarkup(value: string): string {
+  const chunks: string[] = []
+  let cursor = 0
+  let suppressedTag: "script" | "style" | null = null
+
+  while (cursor < value.length) {
+    const tagStart = value.indexOf("<", cursor)
+    if (tagStart === -1) {
+      if (!suppressedTag) chunks.push(value.slice(cursor))
+      break
+    }
+
+    if (!suppressedTag && tagStart > cursor) chunks.push(value.slice(cursor, tagStart))
+
+    const tagEnd = value.indexOf(">", tagStart + 1)
+    if (tagEnd === -1) {
+      // An unmatched "<" is plain text, not executable markup.
+      if (!suppressedTag) chunks.push(value.slice(tagStart))
+      break
+    }
+
+    const tag = htmlTag(value.slice(tagStart + 1, tagEnd))
+    if (suppressedTag) {
+      if (tag?.closing && tag.name === suppressedTag) {
+        suppressedTag = null
+        chunks.push(" ")
+      }
+    } else {
+      chunks.push(" ")
+      if (tag && !tag.closing && !tag.selfClosing && (tag.name === "script" || tag.name === "style")) {
+        suppressedTag = tag.name
+      }
+    }
+
+    cursor = tagEnd + 1
+  }
+
+  return chunks.join("")
+}
+
 // Some feeds (e.g. Agência Brasil) double-encode embedded HTML, so literal
 // tags survive as "&lt;p&gt;" after the XML parser's single decode pass.
 // Decode entities and strip tags across two passes to unwrap that safely.
 export function plainText(value: unknown): string {
   if (typeof value !== "string") return ""
   let text = value
-  // Strip embedded script and style elements first to prevent script/style blocks from bleeding into description text
-  text = text.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ")
   for (let pass = 0; pass < 2; pass += 1) {
-    text = decodeEntities(text).replace(/<[^>]*>/g, " ")
+    text = stripHtmlMarkup(decodeEntities(text))
   }
   // Strip leaked HTML attribute key-value pairs from WordPress feed images
   text = text.replace(LEAKED_ATTR_REGEX, " ")
