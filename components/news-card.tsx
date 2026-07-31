@@ -1,8 +1,8 @@
 "use client"
 
-import { Heart, Share2, ExternalLink, Bot, Users } from "lucide-react"
+import { memo, useMemo } from "react"
+import { Heart, Share2, ExternalLink, FileText, Users } from "lucide-react"
 import { getCategoryBadgeStyle, type NewsItem } from "@/lib/news"
-import { relativeTime, isNew } from "@/lib/time"
 import { classifyTone } from "@/lib/summary"
 import { IconButton } from "@/components/ui/icon-button"
 import { NewsImage } from "@/components/ui/news-image"
@@ -24,8 +24,12 @@ function Actions({
   return (
     <div className="relative flex items-center gap-1.5">
       {onQuickSummary && (
+        // FileText, not a robot: the feature extracts sentences from the feed,
+        // it does not generate anything. The label was corrected when the
+        // "IA Local" naming went away; the icon was missed and kept promising
+        // something the code never did.
         <IconButton label="Resumo rápido" onClick={onQuickSummary}>
-          <Bot className="size-4 text-primary" aria-hidden="true" />
+          <FileText className="size-4 text-primary" aria-hidden="true" />
         </IconButton>
       )}
       <IconButton
@@ -53,21 +57,37 @@ function Actions({
 
 type NewsCardProps = {
   item: NewsItem
-  now: number | null
+  /**
+   * Already formatted by the list. Passing the rendered string instead of the
+   * raw `now` timestamp is what lets memo do its job: `now` ticks every 60s and
+   * would invalidate every card, while this string changes only when the card's
+   * displayed age actually changes. Empty for undated items or before
+   * hydration, in which case the time and its separator are dropped so no
+   * dangling "·" is left behind.
+   */
+  time: string
+  isNew: boolean
   query: string
   favorite: boolean
-  onFavorite: () => void
-  onShare: () => void
-  onQuickSummary?: () => void
-  onShowSources?: () => void
+  /**
+   * Handlers take the item so the list can pass one stable function to every
+   * card. They used to be zero-argument closures built inside the list's map,
+   * which meant four fresh functions per card on every render — memo compared
+   * them, found them different, and re-rendered all 100 cards anyway.
+   */
+  onFavorite: (item: NewsItem) => void
+  onShare: (item: NewsItem) => void
+  onQuickSummary?: (item: NewsItem) => void
+  onShowSources?: (item: NewsItem) => void
   lead?: boolean
   // Position in the list, used only for the entrance-animation cascade.
   staggerIndex?: number
 }
 
-export function NewsCard({
+function NewsCardComponent({
   item,
-  now,
+  time,
+  isNew: itemIsNew,
   query,
   favorite,
   onFavorite,
@@ -77,17 +97,17 @@ export function NewsCard({
   lead = false,
   staggerIndex,
 }: NewsCardProps) {
-  const itemIsNew = isNew(item.publishedAt, now)
-  // Empty for undated items (publishedAt === "") or before hydration; when empty
-  // we drop the time and its separator so no dangling "·" is left behind.
-  const time = relativeTime(item.publishedAt, now)
   // A fixed class (.stagger-0..8 in globals.css), not a `style="--stagger:N"`
   // attribute — the CSP's style-src 'self' has no 'unsafe-inline'/hashes, so
   // inline style attributes are silently dropped by the browser.
   const staggerClass = staggerIndex === undefined ? "" : ` stagger-${Math.min(staggerIndex, 8)}`
   // Only flagged when notable — routine "Informativo" stories (the vast
   // majority) don't need an extra badge competing with the category color.
-  const tone = classifyTone(item)
+  //
+  // Memoised because classifyTone normalises and runs four regexes over the
+  // title, description and source. Cheap once, but it ran on every render of
+  // every card, and the result only depends on the item.
+  const tone = useMemo(() => classifyTone(item), [item])
 
   const content = (
     <>
@@ -120,9 +140,9 @@ export function NewsCard({
             <span className={lead ? "opacity-40" : "opacity-30"} aria-hidden="true">·</span>
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                onShowSources?.()
+              onClick={(event) => {
+                event.stopPropagation()
+                onShowSources?.(item)
               }}
               className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-extrabold text-primary transition-all hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               title="Clique para ver os veículos de imprensa que cobrem esta notícia"
@@ -153,7 +173,13 @@ export function NewsCard({
         >
           {item.source} ↗
         </a>
-        <Actions item={item} favorite={favorite} toggleFavorite={onFavorite} share={onShare} onQuickSummary={onQuickSummary} />
+        <Actions
+          item={item}
+          favorite={favorite}
+          toggleFavorite={() => onFavorite(item)}
+          share={() => onShare(item)}
+          onQuickSummary={onQuickSummary && (() => onQuickSummary(item))}
+        />
       </div>
     </>
   )
@@ -182,3 +208,15 @@ export function NewsCard({
     </article>
   )
 }
+
+/**
+ * Memoised with the default shallow comparison.
+ *
+ * The list renders up to 100 of these. Before this, every keystroke in the
+ * search box and every 60-second tick of the clock re-rendered all of them,
+ * because the dashboard owns both and nothing below it was memoised. The props
+ * above were reshaped specifically so shallow comparison works: derived strings
+ * instead of a shared ticking timestamp, and stable handlers instead of
+ * per-card closures.
+ */
+export const NewsCard = memo(NewsCardComponent)

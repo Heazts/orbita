@@ -1,6 +1,7 @@
 "use client"
 
 import useSWR from "swr"
+import dynamic from "next/dynamic"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Period, Sort } from "@/lib/types"
 import { useFavorites } from "@/hooks/use-favorites"
@@ -18,13 +19,30 @@ import {
   type NewsItem,
   type NewsResponse,
 } from "@/lib/news"
-import { QuickSummaryModal } from "@/components/quick-summary-modal"
-import { SourcesModal } from "@/components/sources-modal"
+// Split out of the initial bundle: these only mount after a card action, so
+// their code (and the shared Modal primitive) is not on the critical path for
+// readers who never open one. ssr:false because a modal can never be part of
+// the first paint — it opens on a click.
+//
+// Measured, not assumed: pnpm check:bundle reports the effect on every PR.
+const QuickSummaryModal = dynamic(
+  () => import("@/components/quick-summary-modal").then((module) => module.QuickSummaryModal),
+  { ssr: false },
+)
+const SourcesModal = dynamic(
+  () => import("@/components/sources-modal").then((module) => module.SourcesModal),
+  { ssr: false },
+)
 import { FinancialTicker } from "@/components/financial-ticker"
 import { SkeletonCard } from "@/components/ui/skeleton-card"
 import { Header } from "@/components/header"
-import { Filters } from "@/components/filters"
-import { Preferences } from "@/components/preferences"
+// Collapsed panels, closed on first paint. ssr stays on: unlike a modal these
+// are plain panels that could legitimately render on the server if their open
+// state ever moves into the URL.
+const Filters = dynamic(() => import("@/components/filters").then((module) => module.Filters))
+const Preferences = dynamic(() =>
+  import("@/components/preferences").then((module) => module.Preferences),
+)
 import { CategoriesNav } from "@/components/categories-nav"
 import { NewsList } from "@/components/news-list"
 import { Sidebar } from "@/components/sidebar"
@@ -373,13 +391,16 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
           <EmptyState onClear={clear} />
         ) : (
           <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,0.65fr)]">
+            {/* Every handler below is passed by reference. An inline arrow
+                here would be a new function on each render and would defeat
+                the cards' memo for that prop, re-rendering all of them. */}
             <NewsList
               items={items}
               now={now}
               query={query}
               favorites={favorites}
               onToggleFavorite={toggleFavorite}
-              onShare={(item) => void share(item)}
+              onShare={share}
               onQuickSummary={setSelectedSummaryItem}
               onShowSources={setSelectedSourcesItem}
             />
