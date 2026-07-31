@@ -1,16 +1,8 @@
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site"
 import { aggregateNews, DEFAULT_NEWS_QUERY } from "@/lib/aggregate"
+import { escapeXml } from "@/lib/xml"
 
 export const revalidate = 300
-
-function escapeXml(unsafe: string): string {
-  return unsafe
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;")
-}
 
 export async function GET() {
   const { items } = await aggregateNews(DEFAULT_NEWS_QUERY)

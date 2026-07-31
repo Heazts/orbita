@@ -5,14 +5,6 @@ type ErrorPageProps = {
   params: Promise<{ code: string }>
 }
 
-export async function generateMetadata({ params }: ErrorPageProps): Promise<Metadata> {
-  const { code } = await params
-  return {
-    title: `Erro ${code.toUpperCase()} · Órbita`,
-    robots: { index: false, follow: false },
-  }
-}
-
 const VALID_CODES = new Set<ErrorCode>([
   "400",
   "403",
@@ -25,11 +17,27 @@ const VALID_CODES = new Set<ErrorCode>([
   "OFFLINE",
 ])
 
+// The path segment is arbitrary visitor-controlled text, so it is resolved
+// against the allowlist before it is used anywhere. generateMetadata used to
+// interpolate it raw, which let any URL put attacker-chosen words in the page
+// title (and in the browser tab / shared-link preview) — "/erro/sua-conta-foi-
+// suspensa" rendered a title saying exactly that, over the site's own name,
+// while the page body showed the generic 500. Both now agree on one value.
+function resolveErrorCode(code: string): ErrorCode {
+  const uppercaseCode = code.toUpperCase() as ErrorCode
+  return VALID_CODES.has(uppercaseCode) ? uppercaseCode : "500"
+}
+
+export async function generateMetadata({ params }: ErrorPageProps): Promise<Metadata> {
+  const { code } = await params
+  return {
+    title: `Erro ${resolveErrorCode(code)} · Órbita`,
+    robots: { index: false, follow: false },
+  }
+}
+
 export default async function SpecificErrorPage({ params }: ErrorPageProps) {
   const { code } = await params
-  const uppercaseCode = code.toUpperCase() as ErrorCode
 
-  const validCode = VALID_CODES.has(uppercaseCode) ? uppercaseCode : "500"
-
-  return <ErrorState code={validCode} />
+  return <ErrorState code={resolveErrorCode(code)} />
 }

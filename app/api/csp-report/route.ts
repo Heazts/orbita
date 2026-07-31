@@ -14,6 +14,10 @@ type CspBody = {
   blockedURL?: string
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
 function sanitize(value: unknown, maxLength: number): string {
   if (typeof value !== "string") return "unknown"
   const noNewlines = value.replace(/[\r\n]/g, "")
@@ -57,13 +61,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return new NextResponse(null, { status: 204 })
   }
 
+  // `JSON.parse` yields any JSON value, including null and primitives. Indexing
+  // those threw a TypeError that surfaced as a 500 on an unauthenticated
+  // endpoint — a bare `null` body was enough. Anything that isn't a usable
+  // shape is simply acknowledged with the same 204 as a well-formed report.
   const reports = (Array.isArray(payload)
-    ? payload.map((entry) => (entry as { body?: CspBody })?.body).filter(Boolean)
-    : [(payload as { "csp-report"?: CspBody })["csp-report"]].filter(Boolean)
-  ).slice(0, MAX_REPORTS_PER_REQUEST)
+    ? payload.map((entry) => (isRecord(entry) ? (entry.body as CspBody | undefined) : undefined))
+    : [isRecord(payload) ? (payload["csp-report"] as CspBody | undefined) : undefined]
+  )
+    .filter((body): body is CspBody => isRecord(body))
+    .slice(0, MAX_REPORTS_PER_REQUEST)
 
   for (const body of reports) {
-    if (!body) continue
     const directive = sanitize(body["violated-directive"] ?? body.effectiveDirective, 256)
     const blocked = sanitize(body["blocked-uri"] ?? body.blockedURL, 256)
     const documentUri = sanitize(body["document-uri"] ?? body.documentURL, 256)

@@ -15,8 +15,16 @@ import {
   normalizeGuess,
   type LetterResult,
 } from "@/lib/games/termo"
-import { EMPTY_STATS, recordResult, shareText, winRate, type TermoStats } from "@/lib/games/termo-stats"
+import {
+  EMPTY_STATS,
+  isTermoStats,
+  recordResult,
+  shareText,
+  winRate,
+  type TermoStats,
+} from "@/lib/games/termo-stats"
 import { useHydratedState } from "@/hooks/use-hydrated-state"
+import { isCount, isPlainObject, isStringArray } from "@/lib/guards"
 import { readStore, writeStore } from "@/lib/storage"
 
 type Attempt = { guess: string; results: LetterResult[] }
@@ -24,6 +32,12 @@ type Mode = "daily" | "free"
 // Saved progress for the daily game, keyed by day so yesterday's guesses are
 // discarded automatically when a new word arrives.
 type SavedDaily = { day: number; guesses: string[] }
+
+// Restored progress is untrusted JSON. A malformed `guesses` used to reach
+// `guesses.map(...)` below and take the whole page down with a TypeError.
+function isSavedDaily(value: unknown): value is SavedDaily {
+  return isPlainObject(value) && isCount(value.day) && isStringArray(value.guesses)
+}
 
 const DAILY_KEY = "orbita-termo-daily"
 const KEY_ROWS = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"]
@@ -63,11 +77,13 @@ export function TermoGame() {
   // Transient feedback only (invalid guess / copied); win-loss text is derived.
   const [message, setMessage] = useState("")
   // Stats count only the daily game, where a streak means something.
-  const [stats, setStats] = useHydratedState<TermoStats>("orbita-termo-stats", EMPTY_STATS)
+  const [stats, setStats] = useHydratedState<TermoStats>("orbita-termo-stats", EMPTY_STATS, isTermoStats)
 
   const startDaily = useCallback(() => {
     const daily = dailyAnswer()
-    const saved = readStore<SavedDaily | null>(DAILY_KEY, null)
+    const saved = readStore<SavedDaily | null>(DAILY_KEY, null, (value): value is SavedDaily | null =>
+      value === null || isSavedDaily(value),
+    )
     const guesses = saved && saved.day === currentDay() ? saved.guesses : []
     setMode("daily")
     setAnswer(daily)

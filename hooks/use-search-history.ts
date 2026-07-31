@@ -2,13 +2,16 @@
 
 import { useCallback } from "react"
 import { useHydratedState } from "@/hooks/use-hydrated-state"
+import { isStringArray } from "@/lib/guards"
 
 export function useSearchHistory(maxEntries = 6): {
   history: string[]
   addTerm: (term: string) => void
   clearHistory: () => void
 } {
-  const [history, setHistory] = useHydratedState<string[]>("orbita-history", [])
+  // Guarded: a non-string entry would reach `existing.toLocaleLowerCase(...)`
+  // in addTerm and throw.
+  const [history, setHistory] = useHydratedState<string[]>("orbita-history", [], isStringArray)
   const addTerm = useCallback(
     (term: string) => {
       setHistory((current) => {

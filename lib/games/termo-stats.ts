@@ -3,6 +3,7 @@
 // the component via useHydratedState.
 
 import type { LetterResult } from "@/lib/games/termo"
+import { isCount, isPlainObject } from "@/lib/guards"
 
 export type TermoStats = {
   played: number
@@ -20,6 +21,22 @@ export const EMPTY_STATS: TermoStats = {
   currentStreak: 0,
   bestStreak: 0,
   distribution: [0, 0, 0, 0, 0, 0],
+}
+
+// Validates stats restored from localStorage. Without this, a corrupted or
+// stale-schema value reaches recordResult, where `[...stats.distribution]`
+// throws on a non-iterable and silently yields NaN counters on a string.
+export function isTermoStats(value: unknown): value is TermoStats {
+  if (!isPlainObject(value)) return false
+  return (
+    isCount(value.played) &&
+    isCount(value.wins) &&
+    isCount(value.currentStreak) &&
+    isCount(value.bestStreak) &&
+    Array.isArray(value.distribution) &&
+    value.distribution.length === EMPTY_STATS.distribution.length &&
+    value.distribution.every(isCount)
+  )
 }
 
 // Folds one finished game into the stats. Pure: returns a new object.

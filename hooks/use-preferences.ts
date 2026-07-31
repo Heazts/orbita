@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect } from "react"
 import { useHydratedState } from "@/hooks/use-hydrated-state"
+import { isPlainObject } from "@/lib/guards"
 
 export type NewsTone = "balanced" | "all"
 
@@ -23,11 +24,29 @@ export const DEFAULT_PREFERENCES: Preferences = {
 
 const STORAGE_KEY = "orbita-prefs"
 
+// Deliberately tolerant of *missing* keys — an object saved by an older version
+// is merged over the defaults below and stays valid. What it rejects is a key
+// present with the wrong type, which the merge would otherwise pass through
+// (a string `reduceMotion` is truthy, so "false" would enable it).
+function isStoredPreferences(value: unknown): value is Preferences {
+  if (!isPlainObject(value)) return false
+  const { tone, newAlerts, reduceMotion } = value
+  return (
+    (tone === undefined || tone === "balanced" || tone === "all") &&
+    (newAlerts === undefined || typeof newAlerts === "boolean") &&
+    (reduceMotion === undefined || typeof reduceMotion === "boolean")
+  )
+}
+
 export function usePreferences(): {
   prefs: Preferences
   setPreference: <K extends keyof Preferences>(key: K, value: Preferences[K]) => void
 } {
-  const [stored, setStored] = useHydratedState<Preferences>(STORAGE_KEY, DEFAULT_PREFERENCES)
+  const [stored, setStored] = useHydratedState<Preferences>(
+    STORAGE_KEY,
+    DEFAULT_PREFERENCES,
+    isStoredPreferences,
+  )
   // Merge over defaults so a partial object saved by an older version (missing
   // a key added later) still yields a complete, well-typed Preferences.
   const prefs: Preferences = { ...DEFAULT_PREFERENCES, ...stored }
