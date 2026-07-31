@@ -25,10 +25,11 @@ import { setTimeout as delay } from "node:timers/promises"
 // Budget for the home page's initial JS, in kilobytes.
 //
 // Raise this only with a reason in the commit message. Lowering it is always
-// welcome — code splitting the interaction-only components (the summary and
-// sources modals, the filters and preferences panels) was measured at roughly
-// 9 KB, so there is known headroom to claim.
-const BUDGET_KB = 780
+// welcome, and this number has already come down once: splitting the
+// interaction-only components (the summary and sources modals, the filters and
+// preferences panels) moved the measurement from 736.6 KB to 727.7 KB, and the
+// budget dropped with it so the gain cannot quietly be given back.
+const BUDGET_KB = 760
 
 const READY_TIMEOUT_MS = 90_000
 const POLL_INTERVAL_MS = 250

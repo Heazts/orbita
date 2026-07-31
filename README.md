@@ -1,6 +1,6 @@
 # Órbita — Notícias do mundo ao vivo
 
-Painel de notícias em português que agrega manchetes de fontes públicas (BBC Brasil, DW Brasil, Euronews, Agência Brasil, Olhar Digital, NASA) e permite pesquisar qualquer assunto via Google News. Construído com Next.js (App Router) e React.
+Painel de notícias em português que agrega manchetes de 22 fontes públicas (lista completa em [Fontes](#fontes)) e permite pesquisar qualquer assunto via Google News. Construído com Next.js (App Router) e React.
 
 ## Stack
 
@@ -45,7 +45,7 @@ lib/
   parse.ts              # parsing de RSS/Atom e cálculo de relevância (testável)
   aggregate.ts          # busca feeds + Google News, dedupe/cluster, filtra e ordena — usado pela rota e pela home (SSR)
   clustering.ts          # agrupa notícias equivalentes de fontes diferentes (similaridade de Jaccard)
-  rate-limit.ts          # rate limiter em memória por IP
+  rate-limit.ts          # rate limit por IP: em memória, ou distribuído via Upstash Redis
   storage.ts             # helpers de leitura/escrita em localStorage
   site.ts               # constantes do site (URL, título, descrição)
 proxy.ts                 # CSP com nonce por request (convenção "proxy" do Next 16)
@@ -63,7 +63,7 @@ A interface é mobile-first com Tailwind (`sm:`/`md:`/`lg:`), testada em 320px, 
 
 ## Funcionalidades
 
-- Agrega fontes públicas de mundo (BBC Brasil, DW Brasil, Euronews), Brasil e política (Agência Brasil), tecnologia (Olhar Digital), ciência (NASA), esportes (GE), saúde (Agência Brasil Saúde), meio ambiente (WWF, G1 Natureza), entretenimento (G1 Pop & Arte), educação (G1 Educação, Agência Brasil Educação), cibersegurança e IA (The Hacker News) e boas notícias (Razões para Acreditar), com busca global via Google News.
+- Agrega fontes públicas de mundo, política, economia, tecnologia, ciência, esportes, saúde, educação, meio ambiente, entretenimento, cibersegurança e boas notícias, com busca global via Google News. A lista canônica está em [Fontes](#fontes).
 - Categorias: Mundo, Boas notícias, Política, Economia, Tecnologia, Cyber & IA, Ciência, Educação, Saúde, Esportes, Cultura, Entretenimento e Meio Ambiente, inferidas por palavra-chave a partir do título/descrição.
 - **Renderizada no servidor**: a home busca a visão padrão em `app/page.tsx` (Server Component) e entrega HTML com manchetes reais na primeira resposta — o painel interativo (`NewsDashboard`) hidrata sobre esses dados em vez de partir de uma tela vazia, o que melhora o LCP e mantém o conteúdo visível mesmo sem JavaScript.
 - **Agrupamento de notícias equivalentes**: a mesma notícia coberta por fontes diferentes (títulos e URLs distintos) é agrupada por similaridade de texto (`lib/clustering.ts`) em vez de aparecer duplicada; o card líder do grupo mostra um selo "N fontes" com as demais fontes no tooltip.
@@ -79,6 +79,39 @@ A interface é mobile-first com Tailwind (`sm:`/`md:`/`lg:`), testada em 320px, 
 - Tema claro/escuro (incluindo um modo escuro bem próximo do preto) com persistência da preferência do usuário.
 - **PWA instalável**: manifest, ícones (192/512, incl. maskable) e service worker (`public/sw.js`), então o navegador oferece "Instalar Órbita" e o app funciona offline (shell em cache; a API de notícias nunca é cacheada).
 - **SEO**: `robots.txt`, `sitemap.xml`, metadados Open Graph/Twitter, URL canônica e dados estruturados JSON-LD (schema.org `WebSite`), gerados por `app/robots.ts`, `app/sitemap.ts` e `app/layout.tsx`.
+
+## Fontes
+
+<!-- FEED_SOURCES:start -->
+<!-- Gerado a partir de FEED_SOURCES em lib/news.ts. tests/readme.test.ts
+     falha se as duas listas divergirem. Não edite à mão. -->
+
+| Fonte | Categoria |
+| --- | --- |
+| BBC Brasil | Mundo |
+| CNN Brasil | Mundo |
+| Euronews | Mundo |
+| Agência Brasil | Política |
+| Poder360 | Política |
+| InfoMoney | Economia |
+| Exame | Economia |
+| Olhar Digital | Tecnologia |
+| Tecnoblog | Tecnologia |
+| Canaltech | Tecnologia |
+| NASA | Ciência |
+| GE (Globo Esporte) | Esportes |
+| Agência Brasil — Saúde | Saúde |
+| Natureza — Meio Ambiente | Meio Ambiente |
+| G1 — Natureza | Meio Ambiente |
+| G1 — Pop & Arte | Entretenimento |
+| G1 — Educação | Educação |
+| Agência Brasil — Educação | Educação |
+| Guia do Estudante | Educação |
+| Revista Educação | Educação |
+| The Hacker News | Cyber & IA |
+| Razões para Acreditar | Boas notícias |
+
+<!-- FEED_SOURCES:end -->
 
 ## Segurança
 
