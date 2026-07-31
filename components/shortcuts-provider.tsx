@@ -1,9 +1,19 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { usePathname, useRouter } from "next/navigation"
 import { useShortcuts } from "@/hooks/use-shortcuts"
 import { usePreferences } from "@/hooks/use-preferences"
 import { ShortcutsModal } from "@/components/shortcuts-modal"
+
+// The search field is identified by its type, which is set in components/header.tsx.
+const SEARCH_SELECTOR = 'input[type="search"]'
+
+// How long to keep looking for the search field after navigating to the home
+// page. The field arrives with the client render, so it is not in the DOM the
+// instant the route changes.
+const FOCUS_RETRY_MS = 1_500
+const FOCUS_RETRY_INTERVAL_MS = 50
 
 /**
  * Binds the global shortcuts once for the whole app and owns the help dialog.
@@ -15,22 +25,46 @@ import { ShortcutsModal } from "@/components/shortcuts-modal"
 export function ShortcutsProvider() {
   const [helpOpen, setHelpOpen] = useState(false)
   const { prefs, setPreference } = usePreferences()
+  const router = useRouter()
+  const pathname = usePathname()
 
   const openHelp = useCallback(() => setHelpOpen(true), [])
 
-  // The search field lives inside the dashboard and is not always mounted (the
-  // games and legal pages have no search). Rather than reach across the tree
-  // with a ref, "/" focuses whatever the page has published as its search
-  // input; when there is none, it falls back to the home page where there is.
-  const focusSearch = useCallback(() => {
-    const input = document.querySelector<HTMLInputElement>('input[type="search"], [data-search-input]')
-    if (input) {
-      input.focus()
-      input.select()
-      return
-    }
-    window.location.assign("/?focus=search")
+  const focusSearchInput = useCallback((): boolean => {
+    const input = document.querySelector<HTMLInputElement>(SEARCH_SELECTOR)
+    if (!input) return false
+    input.focus()
+    input.select()
+    return true
   }, [])
+
+  // Set when "/" was pressed on a page that has no search field, so focus can
+  // be applied once the home page has actually rendered one.
+  const awaitingSearchRef = useRef(false)
+
+  const focusSearch = useCallback(() => {
+    if (focusSearchInput()) return
+    // Pages like /jogos and /termos have no search field. Send the reader to
+    // the home page, then focus the field there — previously this navigated to
+    // "/?focus=search", a parameter nothing ever read, so the shortcut left the
+    // reader on the home page with focus still at the top of the document.
+    awaitingSearchRef.current = true
+    router.push("/")
+  }, [focusSearchInput, router])
+
+  useEffect(() => {
+    if (!awaitingSearchRef.current) return
+
+    const startedAt = Date.now()
+    const timer = setInterval(() => {
+      if (focusSearchInput() || Date.now() - startedAt > FOCUS_RETRY_MS) {
+        awaitingSearchRef.current = false
+        clearInterval(timer)
+      }
+    }, FOCUS_RETRY_INTERVAL_MS)
+
+    return () => clearInterval(timer)
+  }, [pathname, focusSearchInput])
 
   useShortcuts({
     enabled: prefs.shortcuts,
