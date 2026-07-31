@@ -55,3 +55,11 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      # Runs after the build because it measures the real production server:
+      # it starts `next start` on a free port and sums the scripts the home
+      # page's HTML actually declares. Summing .next/static would be easier and
+      # wrong — that total counts lazily-loaded chunks nobody fetches on first
+      # paint.
+      - name: Bundle size budget
+        run: pnpm check:bundle
