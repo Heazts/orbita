@@ -37,7 +37,7 @@ export default function JogosPage() {
           </Link>
         </div>
       </header>
-      <main className="mx-auto max-w-3xl px-5 py-8 md:px-8 md:py-12">
+      <main id="conteudo-principal" className="mx-auto max-w-3xl px-5 py-8 md:px-8 md:py-12">
         <h1 className="text-balance font-serif text-3xl font-bold md:text-4xl">Jogos</h1>
         <p className="mt-2 text-sm text-muted-foreground">Uma pausa leve entre as notícias.</p>
         <div className="mt-8 grid gap-4 sm:grid-cols-2">

@@ -14,12 +14,17 @@ export type Preferences = {
   newAlerts: boolean
   // Kill all non-essential animation (ticker, card cascade, fades).
   reduceMotion: boolean
+  // Global keyboard shortcuts ("/", "?", Alt+number). On by default, but some
+  // assistive tech and alternative input devices synthesise keystrokes that
+  // collide with single-key shortcuts, so this has to be switchable off.
+  shortcuts: boolean
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   tone: "balanced",
   newAlerts: true,
   reduceMotion: false,
+  shortcuts: true,
 }
 
 const STORAGE_KEY = "orbita-prefs"
@@ -30,11 +35,12 @@ const STORAGE_KEY = "orbita-prefs"
 // (a string `reduceMotion` is truthy, so "false" would enable it).
 function isStoredPreferences(value: unknown): value is Preferences {
   if (!isPlainObject(value)) return false
-  const { tone, newAlerts, reduceMotion } = value
+  const { tone, newAlerts, reduceMotion, shortcuts } = value
   return (
     (tone === undefined || tone === "balanced" || tone === "all") &&
     (newAlerts === undefined || typeof newAlerts === "boolean") &&
-    (reduceMotion === undefined || typeof reduceMotion === "boolean")
+    (reduceMotion === undefined || typeof reduceMotion === "boolean") &&
+    (shortcuts === undefined || typeof shortcuts === "boolean")
   )
 }
 

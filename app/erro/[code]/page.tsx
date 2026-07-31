@@ -15,6 +15,7 @@ const VALID_CODES = new Set<ErrorCode>([
   "503",
   "504",
   "OFFLINE",
+  "MANUTENCAO",
 ])
 
 // The path segment is arbitrary visitor-controlled text, so it is resolved

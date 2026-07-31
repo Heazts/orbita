@@ -10,7 +10,7 @@ type NewsListProps = {
   favorites: Record<string, NewsItem>
   onToggleFavorite: (item: NewsItem) => void
   onShare: (item: NewsItem) => void
-  onAiSummary?: (item: NewsItem) => void
+  onQuickSummary?: (item: NewsItem) => void
   onShowSources?: (item: NewsItem) => void
 }
 
@@ -21,7 +21,7 @@ export function NewsList({
   favorites,
   onToggleFavorite,
   onShare,
-  onAiSummary,
+  onQuickSummary,
   onShowSources,
 }: NewsListProps) {
   return (
@@ -37,7 +37,7 @@ export function NewsList({
           favorite={Boolean(favorites[item.id])}
           onFavorite={() => onToggleFavorite(item)}
           onShare={() => onShare(item)}
-          onAiSummary={() => onAiSummary?.(item)}
+          onQuickSummary={() => onQuickSummary?.(item)}
           onShowSources={() => onShowSources?.(item)}
         />
       ))}

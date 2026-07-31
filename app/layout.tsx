@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Lora } from "next/font/google"
 import { headers } from "next/headers"
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "@/lib/site"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { ShortcutsProvider } from "@/components/shortcuts-provider"
 import { ServiceWorkerRegister } from "./sw-register"
 import "./globals.css"
 
@@ -109,9 +110,15 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <script nonce={nonce} suppressHydrationWarning type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializedJsonLd }} />
       </head>
       <body className="font-sans antialiased">
+        {/* First focusable element in the document. See .skip-link in
+            globals.css — hidden until focused, then slides into view. */}
+        <a href="#conteudo-principal" className="skip-link">
+          Pular para o conteúdo principal
+        </a>
         <ErrorBoundary>
           {children}
         </ErrorBoundary>
+        <ShortcutsProvider />
         <ServiceWorkerRegister />
       </body>
     </html>

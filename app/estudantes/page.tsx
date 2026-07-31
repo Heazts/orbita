@@ -38,7 +38,7 @@ export default async function EstudantesPage() {
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-5xl flex-col gap-8 px-5 py-8 md:px-8 md:py-12">
+      <main id="conteudo-principal" className="mx-auto flex max-w-5xl flex-col gap-8 px-5 py-8 md:px-8 md:py-12">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-primary">Área do estudante</p>
           <h1 className="mt-2 text-balance font-serif text-3xl font-bold md:text-4xl">
