@@ -7,9 +7,9 @@
  * site ships is rendered from GRID below, so the favicon, the header mark, the
  * PWA icons and the social image cannot drift apart.
  *
- * Subject: an orbit — a body at the centre with a ring around it, tilted. It
- * reads at 16px because the ring is one cell thick with a full cell of gap, and
- * the body is a solid 4x4 block that survives any downscale.
+ * Subject: an astronaut bust — helmet, visor and shoulders. It replaced an
+ * abstract orbit ring, which was on-theme but read as a letter O at small
+ * sizes and gave the product no character.
  *
  * Run with: node scripts/generate-icons.mjs
  */
@@ -21,36 +21,62 @@ import { fileURLToPath } from "node:url"
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const PUBLIC = join(ROOT, "public")
 
-// 16x16 authoring grid.
-//   "." transparent · "o" ring (accent) · "#" body (foreground)
+// 32x32 authoring grid — an astronaut bust.
+//   "." transparent · "#" suit/helmet (foreground) · "o" visor and chest panel (accent)
 //
-// A body inside a closed ring: the orbit read comes from the two elements
-// being separated by a full ring of empty cells, and from the ring being the
-// accent colour while the body is the foreground colour. Both are essential —
-// in the monochrome variant the colour cue is gone and only the gap carries it,
-// which is why the gap is a whole cell wide rather than a hairline.
+// Authored at 32, not 16. A character needs a helmet, a neck and shoulders to
+// read as a person, and 16 cells cannot hold all three legibly — the first
+// attempt at this mark was drawn at 16 and came out looking like an eye. 32
+// still divides evenly into every size shipped (32/32=1, 192/32=6, 512/32=16),
+// so cells stay on whole pixels.
 //
-// The mark occupies rows 1..14 and columns 0..15, leaving one empty row top and
-// bottom so it is optically centred in the square. The body is 4 rows tall and
-// 6 cells wide at its widest, which is the smallest block that still reads as a
-// rounded mass rather than a plus sign once it is scaled down to 16px.
+// Two decisions carry the whole read, both of them found by rendering and
+// looking rather than by reasoning:
+//
+// 1. The visor is a window in the *lower* half of the dome, with four rows of
+//    shell above it. An earlier draft let the visor fill nearly the whole
+//    helmet; with no dome left, the silhouette stopped being a helmet.
+//
+// 2. The shoulder profile is per-row and deliberately not a smooth ramp.
+//    Interpolating linearly from neck width to base width produces a cone,
+//    which reads as a chess pawn. Real shoulders flare fast and then drop
+//    almost vertically, and that change of angle is what the eye recognises.
+//
+// Regenerate assets after editing with `pnpm icons`; tests/icons.test.ts
+// rebuilds the inline component's tables from this grid and fails on drift.
 const GRID = [
-  "................",
-  ".....oooooo.....",
-  "...oo......oo...",
-  "..o..........o..",
-  ".o............o.",
-  "o..............o",
-  "o.....####.....o",
-  "o....######....o",
-  "o....######....o",
-  "o.....####.....o",
-  "o..............o",
-  ".o............o.",
-  "..o..........o..",
-  "...oo......oo...",
-  ".....oooooo.....",
-  "................",
+  "................................",
+  "............########............",
+  "..........############..........",
+  ".........##############.........",
+  ".........##############.........",
+  "........################........",
+  "........################........",
+  ".......##################.......",
+  ".......##################.......",
+  ".......#####oooooooo#####.......",
+  ".......####oooooooooo####.......",
+  ".......###oooooooooooo###.......",
+  ".......##oooooooooooooo##.......",
+  "........#oooooooooooooo#........",
+  "........##oooooooooooo##........",
+  ".........##oooooooooo##.........",
+  ".........###oooooooo###.........",
+  "..........############..........",
+  "............########............",
+  ".............######.............",
+  ".............######.............",
+  ".........##############.........",
+  "......####################......",
+  "....########################....",
+  "...##########################...",
+  "...##########################...",
+  "...###########oooo###########...",
+  "...##########oooooo##########...",
+  "..###########oooooo###########..",
+  "..############oooo############..",
+  "..############################..",
+  "..############################..",
 ]
 
 const CELLS = GRID.length
@@ -129,15 +155,15 @@ const hexToRgba = (hex, alpha = 255) => {
  * `cellSize` must be a whole number of pixels and the resulting margin must be
  * whole too. That is the one rule that keeps pixel art crisp: the moment a cell
  * edge lands on a fractional pixel, some cells round up and their neighbours
- * round down, and the ring comes out with uneven stroke widths.
+ * round down, and outlines come out with uneven stroke widths.
  *
  * The first version of this function produced the inset (maskable) variant by
  * rendering at full size and then resampling down, which broke exactly that
- * rule — 512 to 448 is a 1.14x factor, so the ring lost a pixel in some places
- * and kept it in others. Drawing straight at the target cell size avoids the
- * resample entirely.
+ * rule — 512 to 448 is a 1.14x factor, so the helmet outline lost a pixel in
+ * some places and kept it in others. Drawing straight at the target cell size
+ * avoids the resample entirely.
  */
-function render({ size, body, ring, background, cellSize = size / CELLS }) {
+function render({ size, suit, visor, background, cellSize = size / CELLS }) {
   if (!Number.isInteger(cellSize)) {
     throw new Error(`cellSize ${cellSize} must be a whole number of pixels`)
   }
@@ -148,8 +174,8 @@ function render({ size, body, ring, background, cellSize = size / CELLS }) {
 
   const rgba = Buffer.alloc(size * size * 4)
   const bg = background ? hexToRgba(background) : [0, 0, 0, 0]
-  const bodyColor = hexToRgba(body)
-  const ringColor = hexToRgba(ring)
+  const suitColor = hexToRgba(suit)
+  const visorColor = hexToRgba(visor)
 
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
@@ -159,8 +185,8 @@ function render({ size, body, ring, background, cellSize = size / CELLS }) {
       const cell = inside ? GRID[cellY][cellX] : "."
 
       let color = bg
-      if (cell === "#") color = bodyColor
-      else if (cell === "o") color = ringColor
+      if (cell === "#") color = suitColor
+      else if (cell === "o") color = visorColor
 
       const offset = (y * size + x) * 4
       rgba[offset] = color[0]
@@ -174,7 +200,7 @@ function render({ size, body, ring, background, cellSize = size / CELLS }) {
 }
 
 /** SVG built from the same grid, one <rect> per filled cell. */
-function renderSvg({ body, ring, background, monochrome = false }) {
+function renderSvg({ suit, visor, background, monochrome = false }) {
   const rects = []
   if (background) {
     rects.push(`<rect width="${CELLS}" height="${CELLS}" fill="${background}"/>`)
@@ -183,7 +209,7 @@ function renderSvg({ body, ring, background, monochrome = false }) {
     for (let x = 0; x < CELLS; x += 1) {
       const cell = GRID[y][x]
       if (cell === ".") continue
-      const fill = monochrome ? "currentColor" : cell === "#" ? body : ring
+      const fill = monochrome ? "currentColor" : cell === "#" ? suit : visor
       const opacity = monochrome && cell === "o" ? ' opacity="0.65"' : ""
       rects.push(`<rect x="${x}" y="${y}" width="1" height="1" fill="${fill}"${opacity}/>`)
     }
@@ -202,21 +228,21 @@ const ACCENT_ON_DARK = "#7aa7ff"
 
 const outputs = [
   // Favicons. 16px is one pixel per cell — the size the grid was drawn for.
-  ["icon-light-32x32.png", render({ size: 32, body: INK, ring: ACCENT_ON_LIGHT })],
-  ["icon-dark-32x32.png", render({ size: 32, body: PAPER, ring: ACCENT_ON_DARK })],
+  ["icon-light-32x32.png", render({ size: 32, suit: INK, visor: ACCENT_ON_LIGHT })],
+  ["icon-dark-32x32.png", render({ size: 32, suit: PAPER, visor: ACCENT_ON_DARK })],
   // PWA / app icons need an opaque background: transparent PNGs render on an
   // unpredictable colour in launchers and on iOS.
-  ["icon-192.png", render({ size: 192, body: PAPER, ring: ACCENT_ON_DARK, background: INK })],
-  ["icon-512.png", render({ size: 512, body: PAPER, ring: ACCENT_ON_DARK, background: INK })],
+  ["icon-192.png", render({ size: 192, suit: PAPER, visor: ACCENT_ON_DARK, background: INK })],
+  ["icon-512.png", render({ size: 512, suit: PAPER, visor: ACCENT_ON_DARK, background: INK })],
   // Maskable: Android crops to an arbitrary shape, so the art has to sit
   // inside a safe zone. 28px cells give 448px of art on a 512px canvas — 87.5%,
   // comfortably inside the 80% circle the spec guarantees — with a whole-pixel
   // 32px margin on each side.
   [
     "icon-maskable-512.png",
-    render({ size: 512, cellSize: 28, body: PAPER, ring: ACCENT_ON_DARK, background: INK }),
+    render({ size: 512, cellSize: 14, suit: PAPER, visor: ACCENT_ON_DARK, background: INK }),
   ],
-  ["apple-icon.png", render({ size: 192, body: PAPER, ring: ACCENT_ON_DARK, background: INK })],
+  ["apple-icon.png", render({ size: 192, suit: PAPER, visor: ACCENT_ON_DARK, background: INK })],
 ]
 
 await mkdir(PUBLIC, { recursive: true })
@@ -227,6 +253,6 @@ for (const [name, buffer] of outputs) {
 
 // The header mark uses currentColor so it inherits the surrounding text colour
 // and therefore works on any surface, in either theme, and in forced-colors.
-await writeFile(join(PUBLIC, "icon.svg"), renderSvg({ body: INK, ring: ACCENT_ON_LIGHT }))
+await writeFile(join(PUBLIC, "icon.svg"), renderSvg({ suit: INK, visor: ACCENT_ON_LIGHT }))
 await writeFile(join(PUBLIC, "icon-mono.svg"), renderSvg({ monochrome: true }))
 console.log("icon.svg, icon-mono.svg")

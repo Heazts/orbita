@@ -44,26 +44,35 @@ describe("generated icon assets", () => {
       "utf8",
     )
 
-    const grid = generator.match(/const GRID = \[([\s\S]*?)\]/)?.[1]
+    const grid = generator.match(/const GRID = \[([\s\S]*?)\n\]/)?.[1]
     expect(grid).toBeDefined()
     const rows = Array.from(grid!.matchAll(/"([.o#]+)"/g)).map((m) => m[1])
-    expect(rows).toHaveLength(16)
-    expect(rows.every((row) => row.length === 16)).toBe(true)
 
-    // Rebuild the ring and body cell lists from the grid and check the
-    // component's hardcoded tables agree. Without this the SVG in the header
-    // and the PNG in the tab can silently diverge.
-    const ringRows: string[] = []
-    const bodyRows: string[] = []
+    // The grid size is read from the grid itself rather than hardcoded: the
+    // mark was authored at 16 and later redrawn at 32, and a pinned number
+    // turns that redesign into a spurious test failure instead of catching a
+    // real problem. What matters is that it is square and that the component
+    // agrees with it.
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows.every((row) => row.length === rows.length)).toBe(true)
+    expect(mark).toContain(`const CELLS = ${rows.length}`)
+
+    // Rebuild the visor and suit cell lists from the grid and check the
+    // component's tables agree. Without this the SVG in the header and the PNG
+    // in the tab can silently diverge.
+    const visorRows: string[] = []
+    const suitRows: string[] = []
     rows.forEach((row, y) => {
-      const ring = [...row].map((c, x) => (c === "o" ? x : -1)).filter((x) => x >= 0)
-      const body = [...row].map((c, x) => (c === "#" ? x : -1)).filter((x) => x >= 0)
-      if (ring.length) ringRows.push(`[${y}, [${ring.join(", ")}]]`)
-      if (body.length) bodyRows.push(`[${y}, [${body.join(", ")}]]`)
+      const visor = [...row].map((c, x) => (c === "o" ? x : -1)).filter((x) => x >= 0)
+      const suit = [...row].map((c, x) => (c === "#" ? x : -1)).filter((x) => x >= 0)
+      if (visor.length) visorRows.push(`[${y}, [${visor.join(", ")}]]`)
+      if (suit.length) suitRows.push(`[${y}, [${suit.join(", ")}]]`)
     })
 
-    for (const entry of ringRows) expect(mark).toContain(entry)
-    for (const entry of bodyRows) expect(mark).toContain(entry)
+    expect(visorRows.length).toBeGreaterThan(0)
+    expect(suitRows.length).toBeGreaterThan(0)
+    for (const entry of visorRows) expect(mark).toContain(entry)
+    for (const entry of suitRows) expect(mark).toContain(entry)
   })
 
   it("draws the mark from currentColor so it works on any surface and theme", () => {

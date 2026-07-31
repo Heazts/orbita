@@ -79,7 +79,11 @@ export function Header({
         >
           {/* aria-hidden: the link already has an accessible name, so naming
               the mark too would make a screen reader read it twice. */}
-          <OrbitaMark className="size-9 text-primary" />
+          {/* text-foreground, not text-primary: the suit is the foreground
+              colour in every generated asset and only the visor takes the
+              accent. Tinting the whole mark blue here would make the header
+              disagree with the favicon sitting right above it in the tab. */}
+          <OrbitaMark className="size-9 text-foreground" />
           <span className="font-serif text-xl font-bold tracking-tight">ÓRBITA</span>
         </Link>
         <div className="flex items-center gap-2">
