@@ -15,7 +15,9 @@
     "lint": "eslint .",
     "test": "vitest",
     "test:run": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:contrast": "node scripts/check-contrast.mjs",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "fast-xml-parser": "^5.10.1",

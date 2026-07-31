@@ -1,0 +1,82 @@
+name: Relatar um bug
+description: Algo não funciona como deveria
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por reportar. Se o problema for uma **vulnerabilidade de
+        segurança**, não abra uma issue pública — siga o processo descrito em
+        [SECURITY.md](../blob/main/SECURITY.md).
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: O que aconteceu
+      description: Descreva o comportamento observado.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: O que você esperava que acontecesse
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Passos para reproduzir
+      placeholder: |
+        1. Acesse '...'
+        2. Clique em '...'
+        3. Observe o erro
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: Página onde ocorre
+      description: URL ou caminho, se aplicável.
+      placeholder: /jogos/termo
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Navegador
+      multiple: true
+      options:
+        - Chrome
+        - Firefox
+        - Safari
+        - Edge
+        - Outro
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device
+    attributes:
+      label: Tipo de dispositivo
+      options:
+        - Computador
+        - Celular
+        - Tablet
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Erros no console
+      description: Se houver mensagens no console do navegador, cole aqui.
+      render: text
+
+  - type: checkboxes
+    id: accessibility
+    attributes:
+      label: Acessibilidade
+      options:
+        - label: Este problema afeta navegação por teclado, leitor de tela ou contraste

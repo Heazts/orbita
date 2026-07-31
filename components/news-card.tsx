@@ -3,7 +3,7 @@
 import { Heart, Share2, ExternalLink, Bot, Users } from "lucide-react"
 import { getCategoryBadgeStyle, type NewsItem } from "@/lib/news"
 import { relativeTime, isNew } from "@/lib/time"
-import { inferEditorialTone } from "@/lib/ai"
+import { classifyTone } from "@/lib/summary"
 import { IconButton } from "@/components/ui/icon-button"
 import { NewsImage } from "@/components/ui/news-image"
 import { Highlight } from "@/components/highlight"
@@ -13,18 +13,18 @@ function Actions({
   favorite,
   toggleFavorite,
   share,
-  onAiSummary,
+  onQuickSummary,
 }: {
   item: NewsItem
   favorite: boolean
   toggleFavorite: () => void
   share: () => void
-  onAiSummary?: () => void
+  onQuickSummary?: () => void
 }) {
   return (
     <div className="relative flex items-center gap-1.5">
-      {onAiSummary && (
-        <IconButton label="Resumo & IA Local" onClick={onAiSummary}>
+      {onQuickSummary && (
+        <IconButton label="Resumo rápido" onClick={onQuickSummary}>
           <Bot className="size-4 text-primary" aria-hidden="true" />
         </IconButton>
       )}
@@ -58,7 +58,7 @@ type NewsCardProps = {
   favorite: boolean
   onFavorite: () => void
   onShare: () => void
-  onAiSummary?: () => void
+  onQuickSummary?: () => void
   onShowSources?: () => void
   lead?: boolean
   // Position in the list, used only for the entrance-animation cascade.
@@ -72,7 +72,7 @@ export function NewsCard({
   favorite,
   onFavorite,
   onShare,
-  onAiSummary,
+  onQuickSummary,
   onShowSources,
   lead = false,
   staggerIndex,
@@ -87,7 +87,7 @@ export function NewsCard({
   const staggerClass = staggerIndex === undefined ? "" : ` stagger-${Math.min(staggerIndex, 8)}`
   // Only flagged when notable — routine "Informativo" stories (the vast
   // majority) don't need an extra badge competing with the category color.
-  const tone = inferEditorialTone(item)
+  const tone = classifyTone(item)
 
   const content = (
     <>
@@ -153,7 +153,7 @@ export function NewsCard({
         >
           {item.source} ↗
         </a>
-        <Actions item={item} favorite={favorite} toggleFavorite={onFavorite} share={onShare} onAiSummary={onAiSummary} />
+        <Actions item={item} favorite={favorite} toggleFavorite={onFavorite} share={onShare} onQuickSummary={onQuickSummary} />
       </div>
     </>
   )

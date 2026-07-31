@@ -1,0 +1,43 @@
+name: Sugerir uma melhoria
+description: Propor uma funcionalidade ou mudança
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Que problema isso resolve
+      description: >
+        Descreva a necessidade, não só a solução. Entender o problema costuma
+        levar a uma solução melhor do que a proposta inicial.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Solução proposta
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas consideradas
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área do projeto
+      multiple: true
+      options:
+        - Notícias / agregador
+        - Área de estudantes
+        - Jogos
+        - Interface e design
+        - Acessibilidade
+        - Desempenho
+        - Segurança
+        - Infraestrutura / CI
+        - Outra
+    validations:
+      required: true

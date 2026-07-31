@@ -390,12 +390,40 @@ export function plainText(value: unknown): string {
   // Some publishers (seen in Globo/GE descriptions) leak a JavaScript object
   // straight into the feed, so the text literally contains "[object Object]".
   // Strip it and any trailing boilerplate call-to-action ("Clique aqui", etc.).
+  //
+  // Order matters for more than tidiness: the whitespace collapse must run
+  // *before* BOILERPLATE_REGEX. That pattern both begins and ends with a
+  // variable-width \s run anchored to $, so against an uncollapsed string the
+  // engine retries every start offset and rescans the same whitespace each
+  // time — quadratic in the length of the run. A feed description ending in a
+  // long stretch of whitespace (descriptions are only bounded by the 5 MB feed
+  // cap) stalled the event loop for seconds. Collapsing first bounds every \s
+  // run to a single space, so the alternation fails on its first literal and
+  // the whole pass is linear.
   return text
     .replace(/\[object Object\]/gi, " ")
-    .replace(BOILERPLATE_REGEX, "")
     .replace(/\s+/g, " ")
+    .replace(BOILERPLATE_REGEX, "")
     .replace(/^["'\s]+|["'\s]+$/g, "")
     .trim()
+}
+
+// Characters trimmed off the end of a truncated description so it never reads
+// "palavra ,…" or "palavra—…".
+const TRAILING_TRIM = new Set([
+  " ", "\t", "\n", "\r", "\f", "\v",
+  ".", ",", ";", ":", "!", "?", "—", "–", "-",
+])
+
+// Deliberately a backwards scan rather than /[...]+$/. That regex form has no
+// left anchor, so the engine restarts it at every offset and the cost is
+// quadratic in the trailing run. The inputs here are bounded by maxLength
+// today, but the bound is the caller's to choose and nothing enforces it — a
+// linear scan removes the sharp edge instead of relying on it staying small.
+function trimTrailing(value: string): string {
+  let end = value.length
+  while (end > 0 && TRAILING_TRIM.has(value[end - 1])) end -= 1
+  return end === value.length ? value : value.slice(0, end)
 }
 
 // Lowercase and strip diacritics so "eleicao" matches "eleição" in search.
@@ -416,11 +444,11 @@ export function truncate(text: string, maxLength: number): string {
     const clipped = cleaned.slice(0, maxLength)
     const lastSpace = clipped.lastIndexOf(" ")
     const base = lastSpace > maxLength * 0.5 ? clipped.slice(0, lastSpace) : clipped
-    return `${base.replace(/[\s.,;:!?\u2014\u2013-]+$/, "")}\u2026`
+    return `${trimTrailing(base)}\u2026`
   }
   // Append ellipsis if sentence does not end with terminal punctuation
   if (!/[.!?]$/.test(cleaned)) {
-    return `${cleaned.replace(/[\s.,;:!?\u2014\u2013-]+$/, "")}\u2026`
+    return `${trimTrailing(cleaned)}\u2026`
   }
   return cleaned
 }

@@ -18,7 +18,7 @@ import {
   type NewsItem,
   type NewsResponse,
 } from "@/lib/news"
-import { AiSummaryModal } from "@/components/ai-summary-modal"
+import { QuickSummaryModal } from "@/components/quick-summary-modal"
 import { SourcesModal } from "@/components/sources-modal"
 import { FinancialTicker } from "@/components/financial-ticker"
 import { SkeletonCard } from "@/components/ui/skeleton-card"
@@ -113,7 +113,7 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [notice, setNotice] = useState("")
   const [newCount, setNewCount] = useState(0)
-  const [selectedAiItem, setSelectedAiItem] = useState<NewsItem | null>(null)
+  const [selectedSummaryItem, setSelectedAiItem] = useState<NewsItem | null>(null)
   const [selectedSourcesItem, setSelectedSourcesItem] = useState<NewsItem | null>(null)
   const previousItemIds = useRef<string[]>([])
 
@@ -297,7 +297,7 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
         {!isLoading && !isValidating && `${items.length} notícia${items.length !== 1 ? "s" : ""} encontrada${items.length !== 1 ? "s" : ""}`}
       </div>
 
-      <main id="conteudo" className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-6 md:px-8 md:py-8">
+      <main id="conteudo-principal" className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-6 md:px-8 md:py-8">
         {visibleNewCount > 0 && !favoritesOnly && !query && <NewItemsPill count={visibleNewCount} />}
 
         <PageHeading
@@ -345,7 +345,7 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
               favorites={favorites}
               onToggleFavorite={toggleFavorite}
               onShare={(item) => void share(item)}
-              onAiSummary={setSelectedAiItem}
+              onQuickSummary={setSelectedAiItem}
               onShowSources={setSelectedSourcesItem}
             />
             <Sidebar onClear={clear} />
@@ -353,8 +353,8 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
         )}
       </main>
 
-      {selectedAiItem && (
-        <AiSummaryModal item={selectedAiItem} onClose={() => setSelectedAiItem(null)} />
+      {selectedSummaryItem && (
+        <QuickSummaryModal item={selectedSummaryItem} onClose={() => setSelectedAiItem(null)} />
       )}
 
       {selectedSourcesItem && (

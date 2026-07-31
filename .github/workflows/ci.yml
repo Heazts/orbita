@@ -46,5 +46,12 @@ jobs:
       - name: Test
         run: pnpm test:run
 
+      # Fails the build if any design token pairing drops below WCAG AA, or if
+      # two status colours become indistinguishable under simulated colour
+      # vision deficiency. Cheap to run and the only automated guard on the
+      # palette — a contrast regression is otherwise invisible in review.
+      - name: Contrast and colour vision check
+        run: pnpm check:contrast
+
       - name: Build
         run: pnpm build

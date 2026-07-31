@@ -27,7 +27,7 @@ export function LegalPage({
           </Link>
         </div>
       </header>
-      <main className="mx-auto max-w-3xl px-5 py-8 md:px-8 md:py-12">
+      <main id="conteudo-principal" className="mx-auto max-w-3xl px-5 py-8 md:px-8 md:py-12">
         <h1 className="text-balance font-serif text-3xl font-bold md:text-4xl">{title}</h1>
         <p className="mt-2 text-sm text-muted-foreground">Última atualização: {updated}</p>
         <div className="mt-8 flex flex-col gap-6 [&_a]:font-medium [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-2 [&_h2]:font-serif [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-foreground [&_li]:text-sm [&_li]:leading-relaxed [&_li]:text-muted-foreground [&_p]:text-sm [&_p]:leading-relaxed [&_p]:text-muted-foreground [&_ul]:flex [&_ul]:list-disc [&_ul]:flex-col [&_ul]:gap-1.5 [&_ul]:pl-5">

@@ -30,7 +30,7 @@ export function GameShell({
           </Link>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-lg px-5 py-6 md:py-8">
+      <main id="conteudo-principal" className="mx-auto w-full max-w-lg px-5 py-6 md:py-8">
         <h1 className="text-balance font-serif text-2xl font-bold md:text-3xl">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
         <div className="mt-6">{children}</div>

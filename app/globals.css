@@ -24,6 +24,16 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  /* Status colours. `destructive` is kept as an alias of danger so existing
+     call sites keep working. */
+  --color-success: var(--success);
+  --color-success-surface: var(--success-surface);
+  --color-warning: var(--warning);
+  --color-warning-surface: var(--warning-surface);
+  --color-danger: var(--danger);
+  --color-danger-surface: var(--danger-surface);
+  --color-info: var(--info);
+  --color-info-surface: var(--info-surface);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -31,16 +41,30 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Design tokens — ONE palette, no off-system hues.
+   Design tokens — ONE neutral palette plus four status hues.
 
-     Fundo/Cards  #FFFFFF · Texto #111111 · Secundário #6B7280
-     Bordas       #E5E7EB · Destaque #2563EB · Urgente #DC2626
+     Fundo/Cards  #FFFFFF · Texto #111111 · Secundário #5B6472
+     Bordas       #E5E7EB · Destaque #1D4ED8
 
    Dark mode is the same palette inverted through *neutral* greys (not navy),
-   with the blue and red lifted one step so they keep AA contrast on a near
-   black ground. Every pairing below is >= 4.5:1:
-     #111111/#FFFFFF 18.9 · #6B7280/#FFFFFF 4.9 · #2563EB/#FFFFFF 5.2
-     #FFFFFF/#111111 18.9 · #9CA3AF/#111111 7.4 · #3B82F6/#111111 4.9
+   with every hue lifted so it keeps AA contrast on a near black ground.
+
+   Every value here is verified by `node scripts/check-contrast.mjs`, which is
+   wired into CI. That script enforces two separate things:
+
+   1. WCAG 2.2 contrast: every text/surface pairing is >= 4.5:1. The lowest in
+      the light theme is aviso on muted at 5.07:1; in the dark theme, erro on
+      muted at 5.96:1.
+
+   2. Dichromacy separation: the four status colours must stay >= 15 deltaE
+      apart from each other after protanopia/deuteranopia/tritanopia
+      simulation. The first palette drafted here failed that — aviso and erro
+      collapsed to deltaE 8.3 under deuteranopia, i.e. a red-blind reader saw
+      "aviso" and "erro" as the same colour. The values below were searched for
+      against that constraint and the worst pair is now 19.0.
+
+   Separation is still not a licence to signal with colour alone: every status
+   in the UI carries an icon and a text label as well (see StatusMessage).
 --------------------------------------------------------------------------- */
 
 :root {
@@ -51,19 +75,56 @@
   --card-foreground: #111111;
   --popover: #ffffff;
   --popover-foreground: #111111;
-  --primary: #2563eb;
+  --primary: #1d4ed8;
   --primary-foreground: #ffffff;
   --secondary: #f3f4f6;
   --secondary-foreground: #111111;
   --muted: #f3f4f6;
-  --muted-foreground: #6b7280;
+  --muted-foreground: #5b6472;
   --accent: #f3f4f6;
   --accent-foreground: #111111;
-  --destructive: #dc2626;
+  --destructive: #8b0000;
   --border: #e5e7eb;
   --input: #e5e7eb;
-  --ring: #2563eb;
+  --ring: #1d4ed8;
   --radius: 0.65rem;
+
+  /* Status. The `-surface` variants are the tinted backgrounds behind status
+     text; each is light enough that its paired foreground clears 4.5:1. */
+  --success: #046c4e;
+  --success-surface: #e7f5ef;
+  --warning: #a35200;
+  --warning-surface: #fdf1e3;
+  --danger: #8b0000;
+  --danger-surface: #fdeaea;
+  --info: #1d4ed8;
+  --info-surface: #e8eefc;
+
+  /* Spacing scale. Tailwind's numeric scale stays available; these name the
+     handful of rhythms the layout actually repeats, so a section gap is
+     changed in one place rather than in forty class attributes. */
+  --space-section: 3rem;
+  --space-block: 1.5rem;
+  --space-item: 0.75rem;
+
+  /* Type scale, 1.2 minor third, clamped so it adapts without a media query.
+     Line heights are set alongside because a size without its leading is only
+     half a decision. */
+  --text-display: clamp(1.875rem, 1.4rem + 2.4vw, 3rem);
+  --text-title: clamp(1.5rem, 1.25rem + 1.2vw, 2.25rem);
+  --text-heading: clamp(1.125rem, 1rem + 0.6vw, 1.5rem);
+  --leading-tight: 1.15;
+  --leading-normal: 1.6;
+
+  /* Motion. Every transition in the app references one of these, so the
+     reduced-motion rule below has a single set of values to neutralise. */
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Minimum hit area. WCAG 2.2 SC 2.5.8 (Target Size, Minimum) requires 24px;
+     24 is the floor, not the goal, so interactive controls aim for 44. */
+  --tap-target: 44px;
 }
 
 /* The two dark rules are byte-identical on purpose: plain CSS can't share one
@@ -78,18 +139,26 @@
   --card-foreground: #ffffff;
   --popover: #1a1a1a;
   --popover-foreground: #ffffff;
-  --primary: #3b82f6;
-  --primary-foreground: #ffffff;
+  --primary: #7aa7ff;
+  --primary-foreground: #111111;
   --secondary: #1f1f1f;
   --secondary-foreground: #ffffff;
   --muted: #1f1f1f;
-  --muted-foreground: #9ca3af;
+  --muted-foreground: #a8b0ba;
   --accent: #1f1f1f;
   --accent-foreground: #ffffff;
-  --destructive: #ef4444;
+  --destructive: #f87171;
   --border: #2a2a2a;
   --input: #2a2a2a;
-  --ring: #3b82f6;
+  --ring: #7aa7ff;
+  --success: #5eead4;
+  --success-surface: #0d2c25;
+  --warning: #fbbf5c;
+  --warning-surface: #33240d;
+  --danger: #f87171;
+  --danger-surface: #341313;
+  --info: #7aa7ff;
+  --info-surface: #14203a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -101,24 +170,32 @@
     --card-foreground: #ffffff;
     --popover: #1a1a1a;
     --popover-foreground: #ffffff;
-    --primary: #3b82f6;
-    --primary-foreground: #ffffff;
+    --primary: #7aa7ff;
+    --primary-foreground: #111111;
     --secondary: #1f1f1f;
     --secondary-foreground: #ffffff;
     --muted: #1f1f1f;
-    --muted-foreground: #9ca3af;
+    --muted-foreground: #a8b0ba;
     --accent: #1f1f1f;
     --accent-foreground: #ffffff;
-    --destructive: #ef4444;
+    --destructive: #f87171;
     --border: #2a2a2a;
     --input: #2a2a2a;
-    --ring: #3b82f6;
+    --ring: #7aa7ff;
+    --success: #5eead4;
+    --success-surface: #0d2c25;
+    --warning: #fbbf5c;
+    --warning-surface: #33240d;
+    --danger: #f87171;
+    --danger-surface: #341313;
+    --info: #7aa7ff;
+    --info-surface: #14203a;
   }
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
   html,
   body {
@@ -134,6 +211,103 @@
   ::selection {
     background: var(--primary);
     color: var(--primary-foreground);
+  }
+
+  /* Focus. One rule for every interactive element, so no component can quietly
+     ship without a focus indicator.
+
+     :focus-visible rather than :focus — the browser decides when the indicator
+     is warranted, so a mouse click on a button does not leave a ring behind
+     while keyboard and assistive-tech navigation always does.
+
+     The ring is drawn with `outline`, never `box-shadow`: outline is the only
+     one Windows High Contrast / forced-colors mode preserves. The offset keeps
+     it clear of the control's own border, and the paired `outline-color` plus
+     a contrasting `box-shadow` halo means the indicator stays visible whether
+     the control sits on the page background or on a filled surface — WCAG 2.2
+     SC 2.4.11 (Focus Appearance) asks for exactly that. */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Anything that opts out of the default indicator must supply its own; this
+     is here so `outline: none` in a component is a deliberate, visible choice
+     rather than an accidental removal. */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* Interactive controls meet WCAG 2.2 SC 2.5.8. Applied as a minimum rather
+     than a fixed size so text-driven controls can still grow. */
+  :where(button, [role="button"], a[href], input[type="checkbox"], input[type="radio"]) {
+    min-height: var(--tap-target);
+    min-width: var(--tap-target);
+  }
+
+  /* Inline links inside prose are exempt: forcing a 44px box around a word in
+     a sentence would break the line box. SC 2.5.8 explicitly excludes targets
+     positioned in a block of text. */
+  :where(p, li, dd, figcaption, .prose) a[href] {
+    min-height: 0;
+    min-width: 0;
+  }
+}
+
+/* Skip link. First focusable element in the document, hidden until focused,
+   so a keyboard user can jump past the header and category nav straight to the
+   content instead of tabbing through every source filter on every page.
+   WCAG 2.2 SC 2.4.1 (Bypass Blocks). */
+.skip-link {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  z-index: 100;
+  translate: -50% -120%;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 700;
+  transition: translate var(--duration-normal) var(--ease-out);
+}
+
+.skip-link:focus-visible {
+  translate: -50% 0;
+}
+
+/* Elevated contrast. Honours the OS-level "increase contrast" setting by
+   strengthening every boundary and dropping the low-emphasis greys that make
+   a calm layout hard to parse when contrast sensitivity is reduced. */
+@media (prefers-contrast: more) {
+  :root {
+    --muted-foreground: #3d4450;
+    --border: #767c87;
+    --input: #767c87;
+  }
+  .dark,
+  :root:not(.light) {
+    --muted-foreground: #d5dae1;
+    --border: #8b939e;
+    --input: #8b939e;
+  }
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline-width: 4px;
+  }
+}
+
+/* Windows High Contrast / forced-colors. The OS replaces the palette wholesale,
+   so the job here is only to make sure nothing disappears: borders that were
+   carrying meaning through colour alone get an explicit width, and the focus
+   ring adopts the system highlight colour. */
+@media (forced-colors: active) {
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+  .skip-link {
+    border: 2px solid ButtonText;
   }
 }
 

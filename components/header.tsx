@@ -14,9 +14,9 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useRef } from "react"
-import { useSearchShortcut } from "@/hooks/use-search-shortcut"
 import type { Theme } from "@/hooks/use-theme"
 import { IconButton } from "@/components/ui/icon-button"
+import { OrbitaMark } from "@/components/ui/orbita-mark"
 
 type HeaderProps = {
   input: string
@@ -57,32 +57,30 @@ export function Header({
   theme,
   onToggleTheme,
 }: HeaderProps) {
+  // "/" is bound globally by ShortcutsProvider, which finds this field by its
+  // type="search". The header no longer registers its own listener — two
+  // handlers for the same key meant whichever ran second re-focused an already
+  // focused field, and only one of them respected the shortcuts preference.
   const searchRef = useRef<HTMLInputElement>(null)
-  useSearchShortcut(searchRef)
 
   const showLiveIndicator = isLive && hasData
 
   return (
     <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      {/* Skip link: visible only on focus — keyboard users jump straight to the news list. */}
-      <a
-        href="#conteudo"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-primary-foreground focus:shadow-lg"
-      >
-        Ir para o conteúdo
-      </a>
-
+      {/* The skip link lives in app/layout.tsx so it exists on every page and is
+          genuinely the first focusable element in the document. It used to be
+          here, which meant it only existed on pages rendering this header, and
+          anything focusable earlier in the DOM came before it. */}
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-3 md:px-8 md:py-4">
-        {/* Logo — decorative link, not the skip link */}
         <Link
           href="/"
-          className="flex items-center gap-3 transition-opacity hover:opacity-80"
+          className="flex items-center gap-2.5 transition-opacity hover:opacity-80"
           aria-label="Órbita — página inicial"
         >
-          <span className="flex size-9 items-center justify-center rounded-full bg-primary text-sm font-black text-primary-foreground">
-            O
-          </span>
-          <span className="font-serif text-xl font-bold">ÓRBITA</span>
+          {/* aria-hidden: the link already has an accessible name, so naming
+              the mark too would make a screen reader read it twice. */}
+          <OrbitaMark className="size-9 text-primary" />
+          <span className="font-serif text-xl font-bold tracking-tight">ÓRBITA</span>
         </Link>
         <div className="flex items-center gap-2">
           {showLiveIndicator && (
