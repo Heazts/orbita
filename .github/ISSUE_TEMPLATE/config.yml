@@ -1,0 +1,10 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Reportar uma vulnerabilidade de segurança
+    url: https://github.com/Heazts/orbita/security/advisories/new
+    about: >
+      Não abra uma issue pública para vulnerabilidades. Use um Security Advisory
+      privado — o processo está descrito em SECURITY.md.
+  - name: Dúvida ou discussão
+    url: https://github.com/Heazts/orbita/discussions
+    about: Para perguntas e ideias que ainda não são um bug ou uma proposta fechada.
