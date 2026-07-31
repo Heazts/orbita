@@ -1,0 +1,66 @@
+name: Scorecard
+
+# OpenSSF Scorecard: audits the repository's own supply-chain posture — are
+# Actions pinned to immutable SHAs, are workflow permissions least-privilege,
+# is branch protection on, are dependencies kept current. It grades the repo
+# itself, which is the gap the other workflows leave: CodeQL reads the app's
+# source, OSV-Scanner reads the lockfile, and neither looks at the CI
+# configuration that both of them run under.
+#
+# Results land in the Security tab as code scanning alerts, alongside CodeQL
+# and OSV-Scanner.
+
+on:
+  # Re-grade when branch protection changes, since that is one of the checks.
+  branch_protection_rule:
+  schedule:
+    - cron: "42 4 * * 2"
+  push:
+    branches: [main]
+
+permissions: read-all
+
+concurrency:
+  group: scorecard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      # Upload the SARIF results to the code scanning dashboard.
+      security-events: write
+      # Publish to the public OpenSSF API via a short-lived OIDC token, which
+      # is what backs the Scorecard badge. Needed only for publish_results.
+      id-token: write
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@55891bbd73f2425e97637d96e306fc9d491d0b21 # v2.4.4
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # Public repo, so the score is published to the OpenSSF transparency
+          # API. This is what lets the badge and the public scorecard resolve.
+          publish_results: true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: SARIF file
+          path: results.sarif
+          retention-days: 5
+
+      - name: Upload to code scanning
+        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          sarif_file: results.sarif
