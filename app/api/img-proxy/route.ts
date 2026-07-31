@@ -1,5 +1,6 @@
 import type { IncomingHttpHeaders } from "node:http"
 import { request as httpsRequest } from "node:https"
+import { isIP } from "node:net"
 import { NextRequest, NextResponse } from "next/server"
 import { resolveRemoteImageUrl, type ResolvedRemoteUrl } from "@/lib/safe-remote-url"
 
@@ -46,18 +47,24 @@ type RemoteResult =
 
 function requestPinnedImage(target: ResolvedRemoteUrl): Promise<RemoteResult> {
   return new Promise((resolve, reject) => {
+    const originalHostname = target.url.hostname.replace(/^\[|\]$/g, "")
     const request = httpsRequest(
-      target.url,
       {
+        protocol: "https:",
+        // Connect to the exact public address that passed validation rather
+        // than passing the user-supplied URL to the network sink. Host and SNI
+        // preserve virtual hosting and TLS verification for the original name.
+        hostname: target.address,
+        family: target.family,
+        port: 443,
+        path: `${target.url.pathname}${target.url.search}`,
+        servername: isIP(originalHostname) ? undefined : originalHostname,
         method: "GET",
         headers: {
+          Host: target.url.host,
           "User-Agent": "Orbita-MediaProxy/1.2 (+https://orbita.news)",
           Accept: "image/avif,image/webp,image/apng,image/*;q=0.8",
         },
-        // Pin the connection to the address that passed the private-network
-        // checks. TLS still validates the original hostname/SNI, while a
-        // second attacker-controlled DNS answer cannot redirect the socket.
-        lookup: (_hostname, _options, callback) => callback(null, target.address, target.family),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       },
       (response) => {
