@@ -12,6 +12,13 @@ const seriesPayload = [
   { data: "01/06/2026", valor: "4.64" },
 ]
 
+// Matches on the exact host rather than a substring: a host name can appear
+// anywhere in a URL, including its path or query, so `includes` routes the
+// wrong request. Same pattern CodeQL flagged in the aggregate test.
+function isCurrencyEndpoint(url: string): boolean {
+  return new URL(url).hostname === "economia.awesomeapi.com.br"
+}
+
 function mockFetch(handler: (url: string) => unknown | null) {
   vi.stubGlobal("fetch", async (input: string | URL) => {
     const url = String(input)
@@ -27,7 +34,7 @@ afterEach(() => {
 
 describe("fetchFinancialIndicators", () => {
   it("returns real currency and Banco Central indicators", async () => {
-    mockFetch((url) => (url.includes("awesomeapi") ? currencyPayload : seriesPayload))
+    mockFetch((url) => (isCurrencyEndpoint(url) ? currencyPayload : seriesPayload))
 
     const indicators = await fetchFinancialIndicators()
     const symbols = indicators.map((item) => item.symbol)
@@ -44,7 +51,7 @@ describe("fetchFinancialIndicators", () => {
   })
 
   it("computes the change between the last two Banco Central readings", async () => {
-    mockFetch((url) => (url.includes("awesomeapi") ? currencyPayload : seriesPayload))
+    mockFetch((url) => (isCurrencyEndpoint(url) ? currencyPayload : seriesPayload))
 
     const indicators = await fetchFinancialIndicators()
     const ipca = indicators.find((item) => item.symbol === "IPCA")
@@ -58,7 +65,7 @@ describe("fetchFinancialIndicators", () => {
   // A move too small to show used to render as "+0,00%" beside an up arrow.
   it("reports a change that rounds away as flat, matching the text", async () => {
     mockFetch((url) =>
-      url.includes("awesomeapi")
+      isCurrencyEndpoint(url)
         ? { ...currencyPayload, USDBRL: { bid: "5.1414", pctChange: "0.001" } }
         : seriesPayload,
     )
@@ -70,7 +77,7 @@ describe("fetchFinancialIndicators", () => {
 
   it("keeps the sign of a change that survives rounding", async () => {
     mockFetch((url) =>
-      url.includes("awesomeapi")
+      isCurrencyEndpoint(url)
         ? { ...currencyPayload, USDBRL: { bid: "5.1414", pctChange: "-0.006" } }
         : seriesPayload,
     )
@@ -82,7 +89,7 @@ describe("fetchFinancialIndicators", () => {
 
   it("omits indicators whose source is unavailable instead of inventing values", async () => {
     // Currencies resolve, every Banco Central series fails.
-    mockFetch((url) => (url.includes("awesomeapi") ? currencyPayload : null))
+    mockFetch((url) => (isCurrencyEndpoint(url) ? currencyPayload : null))
 
     const indicators = await fetchFinancialIndicators()
     expect(indicators.map((item) => item.symbol)).toEqual(["USD/BRL", "EUR/BRL", "BTC/BRL"])

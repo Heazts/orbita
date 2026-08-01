@@ -77,7 +77,10 @@ describe("aggregateNews when sources work", () => {
     // an outage.
     vi.stubGlobal("fetch", async (input: string | URL) => {
       const url = String(input)
-      if (url.includes("news.google.com")) {
+      // Matched on the exact host rather than a substring: "news.google.com"
+      // can appear anywhere in a URL — as a path or a query parameter — so
+      // `includes` would route the wrong request here.
+      if (new URL(url).hostname === "news.google.com") {
         return new Response(`<?xml version="1.0"?><rss version="2.0"><channel></channel></rss>`, {
           status: 200,
         })
