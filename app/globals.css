@@ -344,6 +344,43 @@
   transition: none !important;
 }
 
+/* The astronaut mark drifts, the way something weightless does.
+ *
+ * Stepped, not smooth. The mark is pixel art rendered with
+ * shapeRendering="crispEdges", and a fractional translate makes the browser
+ * resample the whole sprite — every hard cell boundary goes soft for the
+ * frames between whole pixels. steps(1, end) holds each keyframe and jumps, so
+ * the sprite only ever sits on whole-pixel offsets and stays crisp. It also
+ * reads as pixel art rather than as a photo being nudged.
+ *
+ * `translate` rather than `transform`: the logo link already animates opacity
+ * on hover, and keeping the property separate means neither can clobber the
+ * other.
+ *
+ * Six seconds and two pixels: at 36px the mark is small enough that anything
+ * faster or taller becomes a distraction sitting next to the headline the
+ * reader is trying to read. */
+@keyframes orbita-drift {
+  0%, 100% { translate: 0 0; }
+  20%      { translate: 0 -1px; }
+  40%, 60% { translate: 0 -2px; }
+  80%      { translate: 0 -1px; }
+}
+
+.orbita-mark {
+  animation: orbita-drift 6s steps(1, end) infinite;
+}
+
+/* Hovering the logo gives it a nudge upward — a hint of leaving, not a launch.
+   Held while hovered rather than played once, so it cannot get stuck mid-way
+   if the pointer leaves early. */
+.orbita-mark-link:hover .orbita-mark,
+.orbita-mark-link:focus-visible .orbita-mark {
+  animation: none;
+  translate: 0 -3px;
+  transition: translate var(--duration-normal) var(--ease-out);
+}
+
 /* Live indicator pulse */
 .live-dot {
   animation: live-pulse 2s ease-in-out infinite;
@@ -387,6 +424,11 @@
   .ticker-track-vertical { animation: none; }
   .live-dot { animation: none; opacity: 1; }
   .live-badge { animation: none; }
+  /* The hover nudge goes too: it is decoration, and the blanket rule below
+     only shortens durations, which would turn it into an instant jump. */
+  .orbita-mark { animation: none; }
+  .orbita-mark-link:hover .orbita-mark,
+  .orbita-mark-link:focus-visible .orbita-mark { translate: 0 0; }
 }
 
 /* Manual "Reduzir animações" preference (usePreferences → <html class>). Mirrors
@@ -394,6 +436,9 @@
 .reduce-motion .ticker-track-vertical { animation: none; }
 .reduce-motion .live-dot { animation: none; opacity: 1; }
 .reduce-motion .live-badge { animation: none; }
+.reduce-motion .orbita-mark { animation: none; }
+.reduce-motion .orbita-mark-link:hover .orbita-mark,
+.reduce-motion .orbita-mark-link:focus-visible .orbita-mark { translate: 0 0; }
 .reduce-motion *,
 .reduce-motion *::before,
 .reduce-motion *::after {

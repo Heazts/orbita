@@ -13,7 +13,6 @@ import {
   X,
 } from "lucide-react"
 import Link from "next/link"
-import { useRef } from "react"
 import type { Theme } from "@/hooks/use-theme"
 import { IconButton } from "@/components/ui/icon-button"
 import { OrbitaMark } from "@/components/ui/orbita-mark"
@@ -58,11 +57,9 @@ export function Header({
   onToggleTheme,
 }: HeaderProps) {
   // "/" is bound globally by ShortcutsProvider, which finds this field by its
-  // type="search". The header no longer registers its own listener — two
-  // handlers for the same key meant whichever ran second re-focused an already
-  // focused field, and only one of them respected the shortcuts preference.
-  const searchRef = useRef<HTMLInputElement>(null)
-
+  // type="search" — hence no ref here. Two handlers for the same key meant
+  // whichever ran second re-focused an already focused field, and only one of
+  // them respected the shortcuts preference.
   const showLiveIndicator = isLive && hasData
 
   return (
@@ -74,17 +71,18 @@ export function Header({
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-3 md:px-8 md:py-4">
         <Link
           href="/"
-          className="flex items-center gap-2.5 transition-opacity hover:opacity-80"
+          className="orbita-mark-link flex items-center gap-2.5 rounded-lg transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Órbita — página inicial"
         >
-          {/* aria-hidden: the link already has an accessible name, so naming
-              the mark too would make a screen reader read it twice. */}
           {/* Inline, not <img src="/icon.svg">. Measured both: the markup is
               844 bytes gzipped, cheaper than a second request, and it cannot
               flash in after paint. No aria-label — the link already carries
               its accessible name, and naming the mark too would make a screen
-              reader announce it twice. */}
-          <OrbitaMark className="size-9" />
+              reader announce it twice.
+
+              orbita-mark drives the drift animation in globals.css, which is
+              purely decorative and disabled under both reduced-motion paths. */}
+          <OrbitaMark className="orbita-mark size-9" />
           <span className="font-serif text-xl font-bold tracking-tight">ÓRBITA</span>
         </Link>
         <div className="flex items-center gap-2">
@@ -123,7 +121,15 @@ export function Header({
           </IconButton>
           <div className="relative">
             <IconButton
-              label={isValidating ? "Atualizando..." : "Atualizar notícias"}
+              // The badge beside this button is aria-hidden, so the count has
+              // to reach a screen reader through the name or not at all.
+              label={
+                isValidating
+                  ? "Atualizando..."
+                  : newCount > 0
+                    ? `Atualizar notícias (${newCount} ${newCount === 1 ? "nova" : "novas"})`
+                    : "Atualizar notícias"
+              }
               onClick={onRefresh}
             >
               <RefreshCw className={`size-4 transition-transform ${isValidating ? "animate-spin" : ""}`} />
@@ -131,7 +137,7 @@ export function Header({
             {newCount > 0 && (
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white"
+                className="pointer-events-none absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-danger-foreground"
               >
                 {newCount > 99 ? "99+" : newCount}
               </span>
@@ -146,7 +152,6 @@ export function Header({
             <Search className="size-5 text-muted-foreground" aria-hidden="true" />
             <span className="sr-only">Pesquisar notícias em toda a internet</span>
             <input
-              ref={searchRef}
               value={input}
               onChange={(event) => onInputChange(event.target.value)}
               type="search"
@@ -174,7 +179,11 @@ export function Header({
           </IconButton>
           <div className="relative">
             <IconButton
-              label="Ver favoritos"
+              label={
+                favoritesCount > 0
+                  ? `Ver favoritos (${favoritesCount})`
+                  : "Ver favoritos"
+              }
               active={favoritesOnly}
               onClick={() => onFavoritesOnlyChange(!favoritesOnly)}
             >
@@ -183,7 +192,7 @@ export function Header({
             {favoritesCount > 0 && (
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white"
+                className="pointer-events-none absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-danger-foreground"
               >
                 {favoritesCount > 99 ? "99+" : favoritesCount}
               </span>
