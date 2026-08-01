@@ -1,6 +1,5 @@
 import { unstable_cache } from "next/cache"
 import {
-  FALLBACK_NEWS,
   FEED_SOURCES,
   curateHomepage,
   normalize,
@@ -54,7 +53,7 @@ async function fetchFeed(url: string, userAgent: string, timeoutMs: number, labe
 // itself still reran on every request within the revalidate window. Shared
 // across every caller (the /api/news route and the home page's server
 // render both hit this same cache key).
-const loadFeedCached = unstable_cache(
+export const loadFeedCached = unstable_cache(
   async (source: FeedSource): Promise<NewsItem[]> =>
     parseFeed(await fetchFeed(source.url, "Orbita-News/1.0", 8_000, `Feed ${source.name}`), source),
   ["orbita-feed"],
@@ -142,14 +141,16 @@ export async function aggregateNews({ query, category, source, period, sort }: N
   // their intent and keep the pure chronological/relevance order above.
   const isDefaultView =
     !query && category === "Todas" && source === "Todas" && period === 0 && sort === "latest"
-  const ordered = isDefaultView ? curateHomepage(unique) : unique
-  const items = ordered.length ? ordered : query ? [] : FALLBACK_NEWS
+  const items = isDefaultView ? curateHomepage(unique) : unique
 
   return {
     items,
     updatedAt: new Date().toISOString(),
     sourceCount: new Set(items.map((item) => item.source)).size,
-    isFallback: !query && unique.length === 0,
+    // Nothing to show *and* something went wrong upstream. Distinguishes an
+    // outage from a filter that simply matched nothing, so the reader is told
+    // which of the two it is instead of being handed invented headlines.
+    sourcesUnavailable: items.length === 0 && failedSources.length > 0,
     ...(isLivePeriod && !query ? { isLive: true } : {}),
     ...(failedSources.length ? { failedSources } : {}),
   }

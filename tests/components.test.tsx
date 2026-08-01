@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { Filters } from "@/components/filters"
-import { EmptyState } from "@/components/empty-state"
+import { EmptyState, SourcesDownState } from "@/components/empty-state"
 import { SearchSuggestions } from "@/components/search-suggestions"
 import { ErrorBanner, FailedSourcesBanner, NewItemsPill, NoticeBanner } from "@/components/feedback-banners"
 
@@ -60,6 +60,46 @@ describe("EmptyState", () => {
     render(<EmptyState onClear={onClear} />)
     fireEvent.click(screen.getByRole("button", { name: /Limpar tudo/ }))
     expect(onClear).toHaveBeenCalledOnce()
+  })
+})
+
+// Replaces four invented articles attributed to real outlets. What matters is
+// that it says the site failed, and never implies there is news to read.
+describe("SourcesDownState", () => {
+  it("says the sources failed rather than blaming the reader's filters", () => {
+    render(<SourcesDownState onRetry={vi.fn()} />)
+    expect(screen.getByText(/Não conseguimos carregar as notícias/)).toBeTruthy()
+    expect(screen.queryByText(/limpar os filtros/i)).toBeNull()
+  })
+
+  it("announces itself, since it replaces content the reader was expecting", () => {
+    render(<SourcesDownState onRetry={vi.fn()} />)
+    expect(screen.getByRole("alert")).toBeTruthy()
+  })
+
+  it("names the sources that did not answer when it knows them", () => {
+    render(<SourcesDownState failedSources={["BBC Brasil", "NASA"]} onRetry={vi.fn()} />)
+    expect(screen.getByText(/BBC Brasil, NASA/)).toBeTruthy()
+  })
+
+  it("says nothing about sources when it has no list", () => {
+    render(<SourcesDownState onRetry={vi.fn()} />)
+    expect(screen.queryByText(/Sem resposta:/)).toBeNull()
+  })
+
+  it("offers a retry that calls back", () => {
+    const onRetry = vi.fn()
+    render(<SourcesDownState onRetry={onRetry} />)
+    fireEvent.click(screen.getByRole("button", { name: /Tentar novamente/ }))
+    expect(onRetry).toHaveBeenCalledOnce()
+  })
+
+  // The whole point of the change: no headline-shaped content, no outlet
+  // presented as having published something.
+  it("shows no article and no timestamp", () => {
+    const { container } = render(<SourcesDownState failedSources={["BBC Brasil"]} onRetry={vi.fn()} />)
+    expect(container.querySelector("a")).toBeNull()
+    expect(container.querySelector("time")).toBeNull()
   })
 })
 

@@ -45,7 +45,12 @@ export type NewsResponse = {
   items: NewsItem[]
   updatedAt: string
   sourceCount: number
-  isFallback?: boolean
+  // True when the list is empty because sources failed, not because the
+  // reader's filters excluded everything. The two need different empty states:
+  // "limpe os filtros" is wrong — and slightly insulting — when the filters are
+  // not the problem. Replaces an `isFallback` flag that was computed, typed,
+  // and never read by anything, while invented articles were shown instead.
+  sourcesUnavailable?: boolean
   isLive?: boolean
   // Names of feed sources that failed to load for this response, so the client
   // can tell the user some sources are temporarily unavailable.

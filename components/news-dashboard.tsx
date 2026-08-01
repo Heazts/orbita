@@ -12,7 +12,6 @@ import { useNewsFilters } from "@/hooks/use-news-filters"
 import { useNewItemsCount } from "@/hooks/use-new-items-count"
 import { useNotice } from "@/hooks/use-notice"
 import {
-  FALLBACK_NEWS,
   FEED_SOURCES,
   isHeavyTopic,
   type NewsItem,
@@ -48,7 +47,7 @@ import { Sidebar } from "@/components/sidebar"
 import { Ticker } from "@/components/ticker"
 import { SearchSuggestions } from "@/components/search-suggestions"
 import { PageHeading } from "@/components/page-heading"
-import { EmptyState } from "@/components/empty-state"
+import { EmptyState, SourcesDownState } from "@/components/empty-state"
 import { SiteFooter } from "@/components/site-footer"
 import { BackToTop } from "@/components/back-to-top"
 import {
@@ -131,30 +130,12 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
   const [selectedSummaryItem, setSelectedSummaryItem] = useState<NewsItem | null>(null)
   const [selectedSourcesItem, setSelectedSourcesItem] = useState<NewsItem | null>(null)
 
-  const fallbackItems = useMemo(
-    () =>
-      now === null
-        ? []
-        : FALLBACK_NEWS.map((item, index) => ({
-            ...item,
-            publishedAt: new Date(now - index * 30 * 60_000).toISOString(),
-          })),
-    [now],
-  )
-
-
-
-
-  // Prefer the server-fetched initialData (real data, valid even during SSR).
-  // Only fall back to the synthetic FALLBACK_NEWS-with-fresh-dates once
-  // hydrated and no initialData was supplied (e.g. NewsDashboard used without
-  // a server-rendering parent).
-  const fallbackData = isDefaultView
-    ? initialData ??
-      (now !== null
-        ? { items: fallbackItems, updatedAt: new Date(now).toISOString(), sourceCount: 0, isFallback: true }
-        : undefined)
-    : undefined
+  // Seeds SWR with the server-rendered page data so the first paint has real
+  // headlines. There is deliberately no synthetic stand-in when initialData is
+  // absent: SWR then reports isLoading and the skeletons show, which is what is
+  // actually happening. The old branch here filled the gap with four invented
+  // articles carrying real outlets' names.
+  const fallbackData = isDefaultView ? initialData : undefined
 
   const { data, error, isLoading, isValidating, mutate } = useSWR<NewsResponse>(apiUrl, fetcher, {
     refreshInterval: isLivePeriod ? 30_000 : 45_000,
@@ -317,7 +298,14 @@ export function NewsDashboard({ initialData }: NewsDashboardProps) {
             </section>
           </div>
         ) : items.length === 0 ? (
-          <EmptyState onClear={clear} />
+          // An outage and an over-narrow filter both end up here, and telling
+          // someone to "limpar os filtros" when no filter is set sends them
+          // looking for a mistake they did not make.
+          data?.sourcesUnavailable || (isDefaultView && !favoritesOnly) ? (
+            <SourcesDownState failedSources={data?.failedSources} onRetry={() => void mutate()} />
+          ) : (
+            <EmptyState onClear={clear} />
+          )
         ) : (
           <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,0.65fr)]">
             {/* Every handler below is passed by reference. An inline arrow
