@@ -1,13 +1,19 @@
 /**
- * The feeds the aggregator reads, and the canned items shown when every one of
- * them fails.
+ * The feeds the aggregator reads.
  *
  * README.md documents this list and tests/readme.test.ts fails if the two
  * diverge — for a news aggregator the source list is a factual claim to its
  * readers, not decoration.
+ *
+ * There is deliberately no placeholder article list here. This file used to
+ * export four invented headlines attributed to BBC Brasil, Agência Brasil,
+ * Olhar Digital and NASA, stamped with the current time and linking to those
+ * outlets' home pages. They were shown whenever every feed failed — so the site
+ * fabricated news precisely when it was broken. An honest empty state is in
+ * components/empty-state.tsx.
  */
 
-import type { FeedSource, NewsItem } from "./types"
+import type { FeedSource } from "./types"
 
 export const FEED_SOURCES: FeedSource[] = [
   {
@@ -121,55 +127,3 @@ export const FEED_SOURCES: FeedSource[] = [
     category: "Boas notícias",
   },
 ]
-
-function createFallbackNews(): NewsItem[] {
-  const now = Date.now()
-  return [
-    {
-      id: "fallback-1",
-      title: "Acompanhe os acontecimentos que movimentam o mundo",
-      description:
-        "Nossa redação digital reúne notícias de fontes públicas e confiáveis em um só lugar.",
-      url: "https://www.bbc.com/portuguese",
-      image: null,
-      source: "BBC Brasil",
-      category: "Mundo",
-      publishedAt: new Date(now).toISOString(),
-    },
-    {
-      id: "fallback-2",
-      title: "Mercados globais analisam o novo cenário econômico",
-      description:
-        "Indicadores internacionais e decisões de bancos centrais seguem no radar dos investidores.",
-      url: "https://agenciabrasil.ebc.com.br/economia",
-      image: null,
-      source: "Agência Brasil",
-      category: "Economia",
-      publishedAt: new Date(now - 30 * 60_000).toISOString(),
-    },
-    {
-      id: "fallback-3",
-      title: "Tecnologia transforma a forma como informação circula",
-      description:
-        "Novas ferramentas ampliam o acesso ao conhecimento e mudam hábitos ao redor do planeta.",
-      url: "https://olhardigital.com.br/",
-      image: null,
-      source: "Olhar Digital",
-      category: "Tecnologia",
-      publishedAt: new Date(now - 60 * 60_000).toISOString(),
-    },
-    {
-      id: "fallback-4",
-      title: "Ciência abre novas janelas para observar o universo",
-      description:
-        "Missões e observatórios avançam na busca por respostas sobre o espaço profundo.",
-      url: "https://www.nasa.gov/news/",
-      image: null,
-      source: "NASA",
-      category: "Ciência",
-      publishedAt: new Date(now - 90 * 60_000).toISOString(),
-    },
-  ]
-}
-
-export const FALLBACK_NEWS: NewsItem[] = createFallbackNews()

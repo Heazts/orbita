@@ -30,6 +30,7 @@ pnpm start         # serve o build de produção
 app/
   api/news/route.ts   # parseia query params, aplica rate limit e chama lib/aggregate.ts
   api/finance/route.ts # busca cotações no servidor (mesma origem, evita bloqueio de CSP)
+  api/health/route.ts  # estado de cada feed (ok/desatualizado/fora do ar) para monitoramento
   layout.tsx           # metadados, fontes e tema
   page.tsx              # Server Component: busca a visão padrão e renderiza a home com dados reais (SSR)
 components/
@@ -74,6 +75,8 @@ A interface é mobile-first com Tailwind (`sm:`/`md:`/`lg:`), testada em 320px, 
 - Busca insensível a acentos (ex.: "eleicao" encontra "eleição") que sempre preserva os resultados do Google. Aceita deep link `?q=termo` (também alvo do `SearchAction` no JSON-LD), gerando URLs de busca compartilháveis.
 - Filtros por categoria, período, fonte e ordenação (mais recentes/mais relevantes); favoritos (com contador) e histórico de busca persistidos em `localStorage`.
 - Quando alguma fonte de feed está indisponível, um aviso discreto lista quais fontes falharam (o payload da API expõe `failedSources`), sem quebrar o restante do painel.
+- **Nada de notícia inventada**: se *todas* as fontes falharem, o painel diz que não conseguiu carregar e oferece nova tentativa — nunca preenche o espaço com manchetes fabricadas. O payload marca `sourcesUnavailable`, o que distingue uma queda de fontes de um filtro que não encontrou nada.
+- **Monitoramento de fontes** (`/api/health`): estado de cada feed — `ok`, `stale` (responde mas não publica há mais de 48h) ou `down` — além das categorias que ficaram sem nenhuma fonte funcionando. Responde 503 só quando *todas* caem; falha parcial fica em 200 com `status: "degraded"`. Lê o mesmo cache de 5 minutos das páginas, então consultar não gera requisição extra às fontes. O cron de ingestão registra as falhas em log de erro em vez de devolvê-las num JSON que ninguém lê.
 - Miniaturas de imagem nas notícias quando o feed original fornece uma (com fallback silencioso se a imagem não carregar).
 - Estados de carregamento com skeletons, botão "voltar ao topo" e atalho de teclado `/` para focar a busca.
 - Tema claro/escuro (incluindo um modo escuro bem próximo do preto) com persistência da preferência do usuário.
