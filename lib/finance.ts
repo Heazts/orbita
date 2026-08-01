@@ -21,11 +21,15 @@ function trendOf(delta: number): Trend {
   return "flat"
 }
 
-function signed(value: number, digits = 2): string {
-  const fixed = Math.abs(value).toFixed(digits).replace(".", ",")
-  if (value > 0) return `+${fixed}`
-  if (value < 0) return `-${fixed}`
-  return `0,${"0".repeat(digits)}`
+// The displayed change and its arrow have to agree. Deriving the trend from the
+// raw value while rounding the text for display let a move of 0.001% render as
+// "+0,00%" beside an up arrow, which reads as a bug. Rounding once and taking
+// the sign from the rounded figure keeps the two in step.
+function signedChange(value: number, digits = 2): { text: string; trend: Trend } {
+  const rounded = Number(value.toFixed(digits))
+  const magnitude = Math.abs(rounded).toFixed(digits).replace(".", ",")
+  const sign = rounded > 0 ? "+" : rounded < 0 ? "-" : ""
+  return { text: `${sign}${magnitude}`, trend: trendOf(rounded) }
 }
 
 async function getJson<T>(url: string): Promise<T | null> {
@@ -53,12 +57,13 @@ function currencyIndicator(
   const bid = Number.parseFloat(quote.bid)
   const pct = Number.parseFloat(quote.pctChange)
   if (!Number.isFinite(bid) || !Number.isFinite(pct)) return null
+  const change = signedChange(pct)
   return {
     symbol,
     name,
     price: format(bid),
-    change: `${signed(pct)}%`,
-    trend: trendOf(pct),
+    change: `${change.text}%`,
+    trend: change.trend,
     note: "AwesomeAPI · cotação do dia",
   }
 }
@@ -84,12 +89,13 @@ async function bcbIndicator(
   if (!Number.isFinite(value)) return null
   const previousValue = previous ? Number.parseFloat(previous.valor) : NaN
   const delta = Number.isFinite(previousValue) ? value - previousValue : 0
+  const change = signedChange(delta)
   return {
     symbol,
     name,
     price: `${value.toFixed(2).replace(".", ",")}%`,
-    change: `${signed(delta)} p.p.`,
-    trend: trendOf(delta),
+    change: `${change.text} p.p.`,
+    trend: change.trend,
     note: `Banco Central · ${latest.data}`,
   }
 }

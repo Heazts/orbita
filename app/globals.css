@@ -27,10 +27,13 @@
   /* Status colours. `destructive` is kept as an alias of danger so existing
      call sites keep working. */
   --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-success-surface: var(--success-surface);
   --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-warning-surface: var(--warning-surface);
   --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
   --color-danger-surface: var(--danger-surface);
   --color-info: var(--info);
   --color-info-surface: var(--info-surface);
@@ -90,12 +93,18 @@
   --radius: 0.65rem;
 
   /* Status. The `-surface` variants are the tinted backgrounds behind status
-     text; each is light enough that its paired foreground clears 4.5:1. */
+     text; each is light enough that its paired foreground clears 4.5:1. The
+     `-foreground` variants are for the inverse case — text *on* a solid status
+     fill, as used by the game tiles. Both directions are checked by
+     scripts/check-contrast.mjs. */
   --success: #046c4e;
+  --success-foreground: #ffffff;
   --success-surface: #e7f5ef;
   --warning: #a35200;
+  --warning-foreground: #ffffff;
   --warning-surface: #fdf1e3;
   --danger: #8b0000;
+  --danger-foreground: #ffffff;
   --danger-surface: #fdeaea;
   --info: #1d4ed8;
   --info-surface: #e8eefc;
@@ -152,10 +161,13 @@
   --input: #2a2a2a;
   --ring: #7aa7ff;
   --success: #5eead4;
+  --success-foreground: #111111;
   --success-surface: #0d2c25;
   --warning: #fbbf5c;
+  --warning-foreground: #111111;
   --warning-surface: #33240d;
   --danger: #f87171;
+  --danger-foreground: #111111;
   --danger-surface: #341313;
   --info: #7aa7ff;
   --info-surface: #14203a;
@@ -183,10 +195,13 @@
     --input: #2a2a2a;
     --ring: #7aa7ff;
     --success: #5eead4;
+    --success-foreground: #111111;
     --success-surface: #0d2c25;
     --warning: #fbbf5c;
+    --warning-foreground: #111111;
     --warning-surface: #33240d;
     --danger: #f87171;
+    --danger-foreground: #111111;
     --danger-surface: #341313;
     --info: #7aa7ff;
     --info-surface: #14203a;

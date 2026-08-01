@@ -8,11 +8,17 @@ import { isCount, isPlainObject } from "@/lib/guards"
 export type TermoStats = {
   played: number
   wins: number
-  // Consecutive daily wins; a loss resets it to zero.
+  // Wins on consecutive days. A loss resets it to zero, and so does a skipped
+  // day — the counter used to survive any gap, so winning once a month showed
+  // as a growing streak.
   currentStreak: number
   bestStreak: number
   // distribution[i] = games won in i+1 attempts.
   distribution: number[]
+  // Day index (see lib/day) of the last daily game folded in, used to tell a
+  // continued streak from a resumed one. Optional so stats saved before this
+  // field existed still validate instead of being discarded.
+  lastDay?: number
 }
 
 export const EMPTY_STATS: TermoStats = {
@@ -33,6 +39,7 @@ export function isTermoStats(value: unknown): value is TermoStats {
     isCount(value.wins) &&
     isCount(value.currentStreak) &&
     isCount(value.bestStreak) &&
+    (value.lastDay === undefined || isCount(value.lastDay)) &&
     Array.isArray(value.distribution) &&
     value.distribution.length === EMPTY_STATS.distribution.length &&
     value.distribution.every(isCount)
@@ -40,18 +47,36 @@ export function isTermoStats(value: unknown): value is TermoStats {
 }
 
 // Folds one finished game into the stats. Pure: returns a new object.
-export function recordResult(stats: TermoStats, won: boolean, attempts: number): TermoStats {
+//
+// `day` is the day index the game belongs to (see lib/day). It is optional
+// because stats saved before the field existed have no previous day to compare
+// against; without it the streak simply continues, which is what the old
+// behaviour did in every case.
+export function recordResult(
+  stats: TermoStats,
+  won: boolean,
+  attempts: number,
+  day?: number,
+): TermoStats {
   const distribution = [...stats.distribution]
   if (won && attempts >= 1 && attempts <= distribution.length) {
     distribution[attempts - 1] += 1
   }
-  const currentStreak = won ? stats.currentStreak + 1 : 0
+
+  // A streak continues only into the very next day. Anything else — a gap, or
+  // stats carried over from before this field existed with no way to tell —
+  // starts a new streak at one.
+  const continues =
+    stats.lastDay === undefined || day === undefined || day === stats.lastDay + 1
+  const currentStreak = won ? (continues ? stats.currentStreak + 1 : 1) : 0
+
   return {
     played: stats.played + 1,
     wins: stats.wins + (won ? 1 : 0),
     currentStreak,
     bestStreak: Math.max(stats.bestStreak, currentStreak),
     distribution,
+    ...(day === undefined ? {} : { lastDay: day }),
   }
 }
 

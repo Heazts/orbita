@@ -1,7 +1,7 @@
 "use client"
 
 import { Eraser, RotateCcw, Timer, Trophy } from "lucide-react"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import {
   DIFFICULTIES,
   SIZE,
@@ -9,7 +9,7 @@ import {
   findConflicts,
   generatePuzzle,
   holesFor,
-  isSolved,
+  isComplete,
   rowOf,
   type Difficulty,
   type Grid,
@@ -35,6 +35,8 @@ export function SudokuGame() {
   const [bestTimes, setBestTimes] = useHydratedState<BestTimes>("orbita-sudoku-best", {})
   // Guards so a solved board is only recorded once per game.
   const recordedRef = useRef(false)
+  // One entry per cell, so moving the selection can move focus with it.
+  const cellRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   const newGame = useCallback((level: Difficulty) => {
     const generated = generatePuzzle(Math.floor(Math.random() * 1_000_000_000), holesFor(level))
@@ -55,10 +57,9 @@ export function SudokuGame() {
   }, [newGame])
 
   const conflicts = useMemo(() => (grid.length ? findConflicts(grid) : new Set<number>()), [grid])
-  const solved = useMemo(
-    () => Boolean(puzzle && grid.length && isSolved(grid, puzzle.solution)),
-    [grid, puzzle],
-  )
+  // Any complete, conflict-free board wins — not just the one the generator
+  // happened to start from.
+  const solved = useMemo(() => Boolean(puzzle) && isComplete(grid), [grid, puzzle])
   const remaining = useMemo(() => grid.filter((v) => v === 0).length, [grid])
 
   // The clock ticks while a puzzle is active and stops on solve.
@@ -92,21 +93,38 @@ export function SudokuGame() {
     [selected, puzzle, solved],
   )
 
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
+  // Moves the selection by one cell, staying inside the board: the old version
+  // stepped through the flat index, so ArrowLeft in the first column jumped to
+  // the end of the row above and ArrowRight in the last column wrapped to the
+  // row below. Focus follows the selection so a screen reader announces the
+  // cell the player just moved to.
+  const moveSelection = useCallback((from: number, dRow: number, dCol: number) => {
+    const row = rowOf(from) + dRow
+    const col = colOf(from) + dCol
+    if (row < 0 || row >= SIZE || col < 0 || col >= SIZE) return
+    const next = row * SIZE + col
+    setSelected(next)
+    cellRefs.current[next]?.focus()
+  }, [])
+
+  // Scoped to the board rather than the window: the previous listener consumed
+  // digits and swallowed arrow-key scrolling anywhere on the page for as long
+  // as a cell was selected, even with focus on another control.
+  const onGridKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
       if (selected === null) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
       if (event.key >= "1" && event.key <= "9") setValue(Number(event.key))
       else if (["0", "Backspace", "Delete"].includes(event.key)) setValue(0)
-      else if (event.key === "ArrowLeft") setSelected((i) => (i === null ? i : Math.max(0, i - 1)))
-      else if (event.key === "ArrowRight") setSelected((i) => (i === null ? i : Math.min(80, i + 1)))
-      else if (event.key === "ArrowUp") setSelected((i) => (i === null ? i : Math.max(0, i - SIZE)))
-      else if (event.key === "ArrowDown") setSelected((i) => (i === null ? i : Math.min(80, i + SIZE)))
+      else if (event.key === "ArrowLeft") moveSelection(selected, 0, -1)
+      else if (event.key === "ArrowRight") moveSelection(selected, 0, 1)
+      else if (event.key === "ArrowUp") moveSelection(selected, -1, 0)
+      else if (event.key === "ArrowDown") moveSelection(selected, 1, 0)
       else return
       event.preventDefault()
-    }
-    window.addEventListener("keydown", handler)
-    return () => window.removeEventListener("keydown", handler)
-  }, [selected, setValue])
+    },
+    [selected, setValue, moveSelection],
+  )
 
   const selRow = selected === null ? -1 : rowOf(selected)
   const selCol = selected === null ? -1 : colOf(selected)
@@ -143,7 +161,13 @@ export function SudokuGame() {
         )}
       </div>
 
-      <div className="grid grid-cols-9 overflow-hidden rounded-lg border-2 border-foreground/60">
+      <div
+        role="group"
+        aria-label="Grade do Sudoku"
+        aria-describedby="sudoku-instrucoes"
+        onKeyDown={onGridKeyDown}
+        className="grid grid-cols-9 overflow-hidden rounded-lg border-2 border-foreground/60"
+      >
         {grid.map((value, index) => {
           const given = puzzle?.givens[index]
           const row = rowOf(index)
@@ -156,15 +180,31 @@ export function SudokuGame() {
             <button
               key={index}
               type="button"
+              ref={(node) => {
+                cellRefs.current[index] = node
+              }}
               onClick={() => setSelected(index)}
-              aria-label={`Linha ${row + 1}, coluna ${col + 1}${value ? `, valor ${value}` : ", vazia"}`}
+              // Roving tabindex: Tab reaches the board once and the arrow keys
+              // move within it, instead of eighty-one stops on the way past.
+              tabIndex={index === (selected ?? 0) ? 0 : -1}
+              aria-label={[
+                `Linha ${row + 1}, coluna ${col + 1}`,
+                value ? `valor ${value}` : "vazia",
+                given ? "fixa" : null,
+                // Conflicts are announced, not just coloured.
+                inConflict ? "em conflito" : null,
+              ]
+                .filter(Boolean)
+                .join(", ")}
               className={[
                 "flex size-9 items-center justify-center text-lg font-bold tabular-nums transition-colors sm:size-10",
                 col % 3 === 0 && col !== 0 ? "border-l-2 border-l-foreground/60" : "border-l border-l-border",
                 row % 3 === 0 && row !== 0 ? "border-t-2 border-t-foreground/60" : "border-t border-t-border",
                 isSelected ? "bg-primary/15" : sameValue ? "bg-primary/10" : related ? "bg-muted" : "bg-background",
                 given ? "text-foreground" : "text-primary",
-                inConflict ? "text-red-600" : "",
+                // Underlined as well as coloured, so a conflict is still
+                // visible without colour vision.
+                inConflict ? "text-danger underline decoration-2 underline-offset-2" : "",
               ].join(" ")}
             >
               {value !== 0 ? value : ""}
@@ -173,9 +213,14 @@ export function SudokuGame() {
         })}
       </div>
 
+      <p id="sudoku-instrucoes" className="max-w-xs text-center text-xs text-muted-foreground">
+        Use as setas para navegar pela grade e as teclas de 1 a 9 para preencher.
+        Backspace apaga. Números em conflito aparecem sublinhados.
+      </p>
+
       <p aria-live="polite" className="min-h-5 text-sm font-medium">
         {solved ? (
-          <span className="text-emerald-600">Resolvido em {formatTime(elapsed)}! 🎉</span>
+          <span className="font-bold text-success">Resolvido em {formatTime(elapsed)}! 🎉</span>
         ) : (
           <span className="text-muted-foreground">{remaining} células restantes</span>
         )}

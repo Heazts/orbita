@@ -46,16 +46,39 @@ function randomAnswer(): string {
   return ANSWERS[Math.floor(Math.random() * ANSWERS.length)]
 }
 
+// Status colours come from the design tokens rather than the raw Tailwind
+// palette, so scripts/check-contrast.mjs actually covers them. The previous
+// pairs failed WCAG 1.4.3: white on amber-500 is 2.15:1 and white on
+// emerald-600 is 3.77:1, against a 4.5:1 minimum for the 14px keyboard keys.
 const TILE_STYLES: Record<LetterResult, string> = {
-  correct: "border-emerald-600 bg-emerald-600 text-white",
-  present: "border-amber-500 bg-amber-500 text-white",
+  correct: "border-success bg-success text-success-foreground",
+  present: "border-warning bg-warning text-warning-foreground",
   absent: "border-border bg-muted text-muted-foreground",
 }
 
 const KEY_STYLES: Record<LetterResult, string> = {
-  correct: "bg-emerald-600 text-white",
-  present: "bg-amber-500 text-white",
-  absent: "bg-muted text-muted-foreground/60",
+  correct: "bg-success text-success-foreground",
+  present: "bg-warning text-warning-foreground",
+  absent: "bg-muted text-muted-foreground",
+}
+
+// Green and amber are the classic red-green confusion pair, so colour alone
+// cannot carry the result. "Present" also gets a ring marker in the corner;
+// "correct" is the plain filled tile. The two are then told apart by shape,
+// which survives any colour vision — and greyscale printing.
+function PresentMarker() {
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute right-1 top-1 size-2 rounded-full border-2 border-current opacity-90"
+    />
+  )
+}
+
+const RESULT_LABELS: Record<LetterResult, string> = {
+  correct: "correta",
+  present: "na palavra, em outra posição",
+  absent: "não está na palavra",
 }
 
 function StatTile({ value, label }: { value: string | number; label: string }) {
@@ -126,12 +149,13 @@ export function TermoGame() {
     setCurrent("")
     setMessage("")
     if (mode === "daily") {
-      writeStore(DAILY_KEY, { day: currentDay(), guesses: next.map((a) => a.guess) })
+      const day = currentDay()
+      writeStore(DAILY_KEY, { day, guesses: next.map((a) => a.guess) })
       const wonNow = isWin(results)
       // Record stats at submit time (not in an effect), so a restored finished
       // game is never counted twice.
       if (wonNow || next.length >= MAX_ATTEMPTS) {
-        setStats((prev) => recordResult(prev, wonNow, next.length))
+        setStats((prev) => recordResult(prev, wonNow, next.length, day))
       }
     }
   }, [answer, attempts, current, finished, mode, setStats])
@@ -235,7 +259,14 @@ export function TermoGame() {
                     <div
                       key={col}
                       role="gridcell"
-                      className={`flex size-13 items-center justify-center rounded-md border-2 text-2xl font-bold uppercase transition-colors sm:size-14 ${
+                      // Without this a screen reader reads five bare letters and
+                      // none of the result the colours are conveying.
+                      aria-label={
+                        result && letter
+                          ? `${letter}, ${RESULT_LABELS[result]}`
+                          : letter || "vazia"
+                      }
+                      className={`relative flex size-13 items-center justify-center rounded-md border-2 text-2xl font-bold uppercase transition-colors sm:size-14 ${
                         result
                           ? TILE_STYLES[result]
                           : filledCurrent
@@ -244,6 +275,7 @@ export function TermoGame() {
                       }`}
                     >
                       {letter}
+                      {result === "present" && <PresentMarker />}
                     </div>
                   )
                 })}
@@ -303,10 +335,11 @@ export function TermoGame() {
                     key={key}
                     type="button"
                     onClick={() => press(key)}
-                    aria-label={key}
-                    className={`flex h-12 flex-1 items-center justify-center rounded-md text-sm font-bold uppercase transition-colors ${hint ? KEY_STYLES[hint] : "bg-secondary text-secondary-foreground hover:bg-muted"}`}
+                    aria-label={hint ? `${key}, ${RESULT_LABELS[hint]}` : key}
+                    className={`relative flex h-12 flex-1 items-center justify-center rounded-md text-sm font-bold uppercase transition-colors ${hint ? KEY_STYLES[hint] : "bg-secondary text-secondary-foreground hover:bg-muted"}`}
                   >
                     {key}
+                    {hint === "present" && <PresentMarker />}
                   </button>
                 )
               })}
@@ -323,6 +356,30 @@ export function TermoGame() {
             </div>
           ))}
         </div>
+
+        {/* The marker is only useful if the reader knows what it means. */}
+        <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+          <li className="flex items-center gap-1.5">
+            <span
+              aria-hidden="true"
+              className="size-4 rounded-sm border-2 border-success bg-success"
+            />
+            Letra correta
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span
+              aria-hidden="true"
+              className="relative size-4 rounded-sm border-2 border-warning bg-warning text-warning-foreground"
+            >
+              <span className="absolute right-px top-px size-1.5 rounded-full border border-current" />
+            </span>
+            Letra na palavra, em outra posição
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="size-4 rounded-sm border-2 border-border bg-muted" />
+            Letra ausente
+          </li>
+        </ul>
 
         {mode === "daily" && stats.played > 0 && (
           <section aria-label="Estatísticas" className="grid w-full max-w-md grid-cols-4 gap-2">
