@@ -55,6 +55,31 @@ describe("fetchFinancialIndicators", () => {
     expect(ipca?.note).toContain("Banco Central")
   })
 
+  // A move too small to show used to render as "+0,00%" beside an up arrow.
+  it("reports a change that rounds away as flat, matching the text", async () => {
+    mockFetch((url) =>
+      url.includes("awesomeapi")
+        ? { ...currencyPayload, USDBRL: { bid: "5.1414", pctChange: "0.001" } }
+        : seriesPayload,
+    )
+
+    const usd = (await fetchFinancialIndicators()).find((item) => item.symbol === "USD/BRL")
+    expect(usd?.change).toBe("0,00%")
+    expect(usd?.trend).toBe("flat")
+  })
+
+  it("keeps the sign of a change that survives rounding", async () => {
+    mockFetch((url) =>
+      url.includes("awesomeapi")
+        ? { ...currencyPayload, USDBRL: { bid: "5.1414", pctChange: "-0.006" } }
+        : seriesPayload,
+    )
+
+    const usd = (await fetchFinancialIndicators()).find((item) => item.symbol === "USD/BRL")
+    expect(usd?.change).toBe("-0,01%")
+    expect(usd?.trend).toBe("down")
+  })
+
   it("omits indicators whose source is unavailable instead of inventing values", async () => {
     // Currencies resolve, every Banco Central series fails.
     mockFetch((url) => (url.includes("awesomeapi") ? currencyPayload : null))

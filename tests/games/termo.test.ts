@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   ANSWERS,
   WORD_LENGTH,
+  currentDay,
   dailyAnswer,
   evaluateGuess,
   isValidGuess,
@@ -80,6 +81,27 @@ describe("dailyAnswer", () => {
     expect(a).toBe(dailyAnswer(new Date("2026-07-24T23:00:00Z")))
     expect(ANSWERS).toContain(a)
     expect(a.length).toBe(WORD_LENGTH)
+  })
+
+  // The word used to change at 21:00 in Brazil, because the day index counted
+  // UTC days. An evening player got the next day's word.
+  it("holds the same word for the whole Brazilian day", () => {
+    const morning = dailyAnswer(new Date("2026-07-24T08:00:00-03:00"))
+    const evening = dailyAnswer(new Date("2026-07-24T22:00:00-03:00"))
+    expect(evening).toBe(morning)
+    // Same instant, seen from UTC, is already the next calendar day.
+    expect(new Date("2026-07-24T22:00:00-03:00").getUTCDate()).toBe(25)
+  })
+
+  it("changes at Brazilian midnight", () => {
+    const before = dailyAnswer(new Date("2026-07-24T23:30:00-03:00"))
+    const after = dailyAnswer(new Date("2026-07-25T00:30:00-03:00"))
+    expect(after).not.toBe(before)
+  })
+
+  it("agrees with currentDay so saved progress is keyed to the right word", () => {
+    const at = new Date("2026-07-24T22:00:00-03:00")
+    expect(dailyAnswer(at)).toBe(ANSWERS[currentDay(at) % ANSWERS.length])
   })
 
   it("changes across days", () => {

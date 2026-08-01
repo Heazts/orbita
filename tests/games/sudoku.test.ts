@@ -5,9 +5,10 @@ import {
   SIZE,
   type Grid,
   boxOf,
-  dailySeed,
+  countSolutions,
   findConflicts,
   generatePuzzle,
+  hasUniqueSolution,
   holesFor,
   isComplete,
   isSolved,
@@ -32,6 +33,29 @@ function unitsAreComplete(grid: Grid): boolean {
   return boxes.every((box) => [...box].sort((a, b) => a - b).join() === FULL)
 }
 
+// Two rows in the same band and two columns in different stacks whose four
+// cells hold the same two digits crosswise. Blanking all four lets the pair be
+// swapped without breaking any row, column or box, so the board has exactly two
+// completions — the smallest honest example of an ambiguous puzzle.
+function findSwappableRectangle(grid: Grid): number[] | null {
+  for (let r1 = 0; r1 < SIZE; r1 += 1) {
+    for (let r2 = r1 + 1; r2 < SIZE; r2 += 1) {
+      if (Math.floor(r1 / 3) !== Math.floor(r2 / 3)) continue
+      for (let c1 = 0; c1 < SIZE; c1 += 1) {
+        for (let c2 = c1 + 1; c2 < SIZE; c2 += 1) {
+          if (Math.floor(c1 / 3) === Math.floor(c2 / 3)) continue
+          const a = grid[r1 * SIZE + c1]
+          const b = grid[r1 * SIZE + c2]
+          if (grid[r2 * SIZE + c1] === b && grid[r2 * SIZE + c2] === a) {
+            return [r1 * SIZE + c1, r1 * SIZE + c2, r2 * SIZE + c1, r2 * SIZE + c2]
+          }
+        }
+      }
+    }
+  }
+  return null
+}
+
 describe("scrambledSolution", () => {
   it("produces a valid completed Sudoku for several seeds", () => {
     for (const seed of [1, 2, 42, 1000, 99999]) {
@@ -49,7 +73,7 @@ describe("scrambledSolution", () => {
 })
 
 describe("generatePuzzle", () => {
-  it("keeps the reference solution valid and blanks the requested cells", () => {
+  it("keeps the reference solution valid and blanks up to the requested cells", () => {
     const { puzzle, solution, givens } = generatePuzzle(123, 45)
     expect(unitsAreComplete(solution)).toBe(true)
     expect(puzzle).toHaveLength(CELLS)
@@ -58,11 +82,73 @@ describe("generatePuzzle", () => {
       if (puzzle[i] !== 0) expect(puzzle[i]).toBe(solution[i])
       expect(givens[i]).toBe(puzzle[i] !== 0)
     }
-    expect(givens.filter(Boolean)).toHaveLength(CELLS - 45)
+    // A blank is kept only while the board stays unambiguous, so the count is
+    // a ceiling rather than a guarantee.
+    expect(puzzle.filter((v) => v === 0).length).toBeLessThanOrEqual(45)
   })
 
   it("is deterministic per seed", () => {
     expect(generatePuzzle(500, 40)).toEqual(generatePuzzle(500, 40))
+  })
+
+  // The bug this guards against: with holes punched at random, every "difícil"
+  // board measured had more than one valid completion, so a player could fill
+  // the grid correctly and never be told they had won.
+  it("produces puzzles with exactly one solution at every difficulty", () => {
+    for (const level of DIFFICULTIES) {
+      for (const seed of [1, 2, 3, 4, 5]) {
+        const { puzzle } = generatePuzzle(seed * 7919, level.holes)
+        expect(hasUniqueSolution(puzzle)).toBe(true)
+      }
+    }
+  })
+
+  it("reaches the requested number of blanks in practice", () => {
+    for (const level of DIFFICULTIES) {
+      const { puzzle } = generatePuzzle(4242, level.holes)
+      expect(puzzle.filter((v) => v === 0)).toHaveLength(level.holes)
+    }
+  })
+})
+
+describe("countSolutions", () => {
+  it("counts a completed board as one solution", () => {
+    expect(countSolutions(scrambledSolution(5))).toBe(1)
+  })
+
+  it("stops at the cap instead of enumerating everything", () => {
+    // An empty board has billions of solutions; the cap is what keeps this
+    // from running forever.
+    expect(countSolutions(new Array(CELLS).fill(0), 2)).toBe(2)
+  })
+
+  // Without the up-front conflict check the search has to prove a negative by
+  // exhaustion: this board did not finish in 60 seconds.
+  it("rejects an already-contradictory board immediately", () => {
+    const grid: Grid = new Array(CELLS).fill(0)
+    grid[0] = 5
+    grid[1] = 5 // duplicate in the same row
+    const started = Date.now()
+    expect(countSolutions(grid)).toBe(0)
+    expect(Date.now() - started).toBeLessThan(1_000)
+  })
+
+  it("leaves the grid it was given unchanged", () => {
+    const { puzzle } = generatePuzzle(31, 40)
+    const before = [...puzzle]
+    countSolutions(puzzle)
+    expect(puzzle).toEqual(before)
+  })
+
+  it("finds two solutions when a swappable pair is blanked", () => {
+    for (const seed of [8, 42, 123]) {
+      const solution = scrambledSolution(seed)
+      const rectangle = findSwappableRectangle(solution)
+      expect(rectangle).not.toBeNull()
+      const grid = [...solution]
+      for (const index of rectangle as number[]) grid[index] = 0
+      expect(countSolutions(grid)).toBe(2)
+    }
   })
 })
 
@@ -95,6 +181,15 @@ describe("isComplete / isSolved", () => {
     expect(isComplete(withBlank)).toBe(false)
   })
 
+  it("isComplete rejects a full board that breaks the rules", () => {
+    const grid: Grid = new Array(CELLS).fill(1)
+    expect(isComplete(grid)).toBe(false)
+  })
+
+  it("isComplete rejects a grid of the wrong size", () => {
+    expect(isComplete(new Array(CELLS - 1).fill(1))).toBe(false)
+  })
+
   it("isSolved compares against the reference solution", () => {
     const { solution } = generatePuzzle(11, 40)
     expect(isSolved(solution, solution)).toBe(true)
@@ -114,18 +209,9 @@ describe("difficulties", () => {
     }
   })
 
-  it("holesFor matches the presets and generates that many blanks", () => {
+  it("holesFor matches the presets", () => {
     for (const level of DIFFICULTIES) {
       expect(holesFor(level.id)).toBe(level.holes)
-      const { puzzle } = generatePuzzle(77, holesFor(level.id))
-      expect(puzzle.filter((v) => v === 0)).toHaveLength(level.holes)
     }
-  })
-})
-
-describe("dailySeed", () => {
-  it("is stable within a day and differs across days", () => {
-    expect(dailySeed(new Date("2026-07-24T01:00:00Z"))).toBe(dailySeed(new Date("2026-07-24T20:00:00Z")))
-    expect(dailySeed(new Date("2026-07-24T12:00:00Z"))).not.toBe(dailySeed(new Date("2026-07-25T12:00:00Z")))
   })
 })

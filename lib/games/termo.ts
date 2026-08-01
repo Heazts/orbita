@@ -1,6 +1,8 @@
 // Pure logic for the "Termo" word game (Portuguese Wordle). Kept free of React
 // so it can be unit-tested in isolation.
 
+import { brasiliaDay } from "@/lib/day"
+
 export const WORD_LENGTH = 5
 export const MAX_ATTEMPTS = 6
 
@@ -63,11 +65,11 @@ export function isWin(results: LetterResult[]): boolean {
   return results.length > 0 && results.every((r) => r === "correct")
 }
 
-// Whole days elapsed since the Unix epoch. Exported so the UI can key the
-// saved daily-game state (and detect that a new day started) with the same
-// counter that picks the answer.
+// Whole days elapsed since the Unix epoch, counted in Brasília time. Exported
+// so the UI can key the saved daily-game state (and detect that a new day
+// started) with the same counter that picks the answer.
 export function currentDay(date: Date = new Date()): number {
-  return Math.floor(date.getTime() / 86_400_000)
+  return brasiliaDay(date)
 }
 
 // Deterministic "word of the day": everyone gets the same answer on the same

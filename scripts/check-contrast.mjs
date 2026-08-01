@@ -79,10 +79,13 @@ const LIGHT = {
   primary: "#1d4ed8",
   primaryForeground: "#ffffff",
   success: "#046c4e",
+  successForeground: "#ffffff",
   successSurface: "#e7f5ef",
   warning: "#a35200",
+  warningForeground: "#ffffff",
   warningSurface: "#fdf1e3",
   danger: "#8b0000",
+  dangerForeground: "#ffffff",
   dangerSurface: "#fdeaea",
   infoSurface: "#e8eefc",
   border: "#e5e7eb",
@@ -99,10 +102,15 @@ const DARK = {
   // has to flip to near-black. White on #7aa7ff is only 2.4:1.
   primaryForeground: "#111111",
   success: "#5eead4",
+  // Same flip as the primary: the dark theme's status colours are light fills,
+  // so text on top of them has to be near-black.
+  successForeground: "#111111",
   successSurface: "#0d2c25",
   warning: "#fbbf5c",
+  warningForeground: "#111111",
   warningSurface: "#33240d",
   danger: "#f87171",
+  dangerForeground: "#111111",
   dangerSurface: "#341313",
   infoSurface: "#14203a",
   border: "#2a2a2a",
@@ -125,6 +133,12 @@ const pairs = (t, theme) => [
   [t.danger, t.muted, 4.5, "erro / superfície muted"],
   // Text sitting on a filled control or a tinted status surface.
   [t.primaryForeground, t.primary, 4.5, "texto do botão / preenchimento primário"],
+  // The Termo tiles and on-screen keyboard put text on a solid status fill.
+  // The keys are 14px, so they need the full 4.5:1 rather than the 3:1 that
+  // would be enough for the 24px tiles.
+  [t.successForeground, t.success, 4.5, "texto sobre preenchimento de sucesso"],
+  [t.warningForeground, t.warning, 4.5, "texto sobre preenchimento de aviso"],
+  [t.dangerForeground, t.danger, 4.5, "texto sobre preenchimento de erro"],
   [t.success, t.successSurface, 4.5, "sucesso / superfície de sucesso"],
   [t.warning, t.warningSurface, 4.5, "aviso / superfície de aviso"],
   [t.danger, t.dangerSurface, 4.5, "erro / superfície de erro"],

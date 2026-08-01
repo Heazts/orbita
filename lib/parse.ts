@@ -128,13 +128,10 @@ export function parseFeed(xml: string, source: FeedSource, isGoogle = false): Ne
       ) {
         return null
       }
-      const url = findLink(item)
-      if (!/^https:\/\//.test(url)) return null
-
-      const trimmedUrl = url.trim()
-      if (!HTTPS_URL.test(trimmedUrl)) return null
-
-      const safeUrl = trimmedUrl
+      // findLink already trims; HTTPS-only, so a feed can never hand us a
+      // javascript: or data: URL to put in an href.
+      const safeUrl = findLink(item)
+      if (!HTTPS_URL.test(safeUrl)) return null
 
       const googleSource = plainText(textValue(item.source))
       const title =
