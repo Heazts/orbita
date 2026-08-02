@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function PrivacidadePage() {
   return (
-    <LegalPage title="Política de Privacidade" updated="24 de julho de 2026">
+    <LegalPage title="Política de Privacidade" updated="2 de agosto de 2026">
       <p>
         A Órbita é um agregador de notícias que reúne manchetes de feeds RSS públicos e da busca do
         Google News. Este é um projeto pessoal e gratuito. Nossa premissa é simples: coletar o mínimo
@@ -35,12 +35,18 @@ export default function PrivacidadePage() {
         <ul>
           <li>Notícias favoritas que você salva;</li>
           <li>Seu histórico de buscas recentes;</li>
-          <li>A preferência de tema (claro ou escuro);</li>
-          <li>Suas preferências de conteúdo (tom das notícias, avisos, animações).</li>
+          <li>A preferência de tema (claro, escuro ou o do sistema);</li>
+          <li>Suas preferências de conteúdo (tom das notícias, avisos, animações, atalhos);</li>
+          <li>
+            No Termo: as tentativas do jogo do dia e suas estatísticas (partidas, vitórias e
+            sequência);
+          </li>
+          <li>No Sudoku: seu melhor tempo em cada nível.</li>
         </ul>
         <p>
-          Você pode apagar tudo a qualquer momento limpando os dados do site nas configurações do seu
-          navegador.
+          O histórico de busca tem um botão para apagar direto no painel de{" "}
+          <strong>Preferências</strong>. Para apagar tudo de uma vez, incluindo favoritos e
+          estatísticas dos jogos, limpe os dados do site nas configurações do seu navegador.
         </p>
       </div>
 
@@ -63,8 +69,9 @@ export default function PrivacidadePage() {
         <h2>Endereço IP e proteção contra abuso</h2>
         <p>
           Quando o app busca notícias na nossa API, seu endereço IP é usado momentaneamente apenas para
-          limitar a quantidade de requisições por minuto (evitar abuso). Esse controle é feito em
-          memória e não guardamos um registro persistente do seu IP.
+          limitar as requisições a cerca de 30 por minuto e evitar abuso. Esse controle é feito em
+          memória, o registro expira sozinho ao fim de cada janela de um minuto, e não guardamos
+          nenhum histórico persistente do seu IP.
         </p>
       </div>
 
@@ -85,7 +92,11 @@ export default function PrivacidadePage() {
 
       <div>
         <h2>Cookies</h2>
-        <p>A Órbita não usa cookies de rastreamento ou de publicidade.</p>
+        <p>
+          A Órbita <strong>não usa cookies</strong> — nem de rastreamento, nem de publicidade, nem de
+          sessão. Não há nenhum, porque não há login nem nada que precise ser lembrado entre
+          dispositivos.
+        </p>
       </div>
 
       <div>

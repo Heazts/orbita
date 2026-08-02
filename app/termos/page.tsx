@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function TermosPage() {
   return (
-    <LegalPage title="Termos de Uso" updated="24 de julho de 2026">
+    <LegalPage title="Termos de Uso" updated="2 de agosto de 2026">
       <p>
         Ao usar a Órbita, você concorda com estes termos. Eles são curtos e diretos de propósito.
       </p>
@@ -23,6 +23,11 @@ export default function TermosPage() {
           produz as notícias: o conteúdo, os títulos e as imagens pertencem aos veículos originais, que
           são sempre creditados e linkados.
         </p>
+        <p>
+          Além do painel de notícias, o site tem uma <strong>área do estudante</strong> e uma seção de{" "}
+          <strong>jogos</strong> (Termo e Sudoku), que funcionam inteiramente no seu navegador e não
+          exigem cadastro.
+        </p>
       </div>
 
       <div>
@@ -30,8 +35,9 @@ export default function TermosPage() {
         <p>
           Não temos controle editorial sobre o que as fontes publicam e não garantimos a exatidão, a
           atualidade ou a disponibilidade de nenhuma notícia. A responsabilidade pelo conteúdo é do
-          veículo que o publicou. Quando uma fonte fica indisponível, a Órbita avisa de forma discreta e
-          segue funcionando com as demais.
+          veículo que o publicou. Quando uma fonte fica indisponível, a Órbita avisa quais falharam e
+          segue funcionando com as demais; se todas ficarem fora do ar, a página diz isso claramente —
+          nunca preenchemos o espaço com manchetes inventadas.
         </p>
       </div>
 
@@ -39,7 +45,10 @@ export default function TermosPage() {
         <h2>Uso aceitável</h2>
         <ul>
           <li>Use a Órbita para fins pessoais e informativos;</li>
-          <li>Não tente sobrecarregar, automatizar em excesso ou abusar da API de notícias;</li>
+          <li>
+            Não tente sobrecarregar ou abusar da API de notícias — há um limite de cerca de 30
+            requisições por minuto por endereço IP, e passar dele devolve erro até a janela virar;
+          </li>
           <li>Não use o serviço para qualquer finalidade ilegal.</li>
         </ul>
       </div>
@@ -57,8 +66,39 @@ export default function TermosPage() {
       <div>
         <h2>Propriedade</h2>
         <p>
-          O código da Órbita é aberto sob a licença MIT. A marca e a identidade &quot;Órbita&quot; são do
-          projeto. O conteúdo das notícias permanece de propriedade dos respectivos veículos.
+          O código da Órbita é aberto sob a{" "}
+          <a
+            href="https://github.com/Heazts/orbita/blob/main/LICENSE"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            licença MIT
+          </a>
+          . A marca e a identidade &quot;Órbita&quot; são do projeto. O conteúdo das notícias permanece
+          de propriedade dos respectivos veículos.
+        </p>
+      </div>
+
+      <div>
+        <h2>Falhas de segurança</h2>
+        <p>
+          Se você encontrar uma vulnerabilidade, avise em particular pelo{" "}
+          <a
+            href="https://github.com/Heazts/orbita/security/advisories/new"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            canal de avisos de segurança do repositório
+          </a>{" "}
+          em vez de abrir uma issue pública. O processo está descrito no{" "}
+          <a
+            href="https://github.com/Heazts/orbita/blob/main/SECURITY.md"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            SECURITY.md
+          </a>
+          .
         </p>
       </div>
 
