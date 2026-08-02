@@ -9,10 +9,19 @@ const CSP_REPORT_GROUP = "csp-endpoint"
 // 'unsafe-eval' and ws: are only needed for Next's dev server (Turbopack HMR);
 // production builds don't use eval. The nonce lets the inline theme-detection
 // and JSON-LD scripts in app/layout.tsx run without 'unsafe-inline'.
+//
+// Vercel Analytics and Speed Insights serve their scripts from /_vercel/… in
+// production — same origin, covered by 'self', no third-party host in the
+// production policy. Only in development do they fall back to the debug bundle
+// on va.vercel-scripts.com, so that host is allowed there and nowhere else.
+// Without it the dev console fills with CSP violations that are not real
+// problems, which is how people learn to ignore CSP violations that are.
+const DEV_ANALYTICS_HOST = "https://va.vercel-scripts.com"
+
 function buildCsp(nonce: string): string {
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}'${isDev ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'nonce-${nonce}'${isDev ? ` 'unsafe-eval' ${DEV_ANALYTICS_HOST}` : ""}`,
     "style-src 'self'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",

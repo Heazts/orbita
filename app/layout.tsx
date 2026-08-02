@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono, Lora } from "next/font/google"
 import { headers } from "next/headers"
+import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "@/lib/site"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { ShortcutsProvider } from "@/components/shortcuts-provider"
@@ -120,6 +122,18 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         </ErrorBoundary>
         <ShortcutsProvider />
         <ServiceWorkerRegister />
+        {/* Both load their script from /_vercel/… — same origin, so the strict
+            CSP in proxy.ts allows them with no exception for a third-party
+            host, and the beacons go to the same origin too. Off Vercel they
+            simply never load.
+
+            Analytics counts page views; Speed Insights reports the real Core
+            Web Vitals of actual visits, which is the only way to know the LCP
+            and INP this site delivers — a lab run measures a machine, not a
+            reader. Neither sets a tracking cookie or identifies a person, and
+            /privacidade says so in those words. */}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )
