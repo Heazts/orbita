@@ -65,7 +65,7 @@ A interface é mobile-first com Tailwind (`sm:`/`md:`/`lg:`), testada em 320px, 
 ## Funcionalidades
 
 - Agrega fontes públicas de mundo, política, economia, tecnologia, ciência, esportes, saúde, educação, meio ambiente, entretenimento, cibersegurança e boas notícias, com busca global via Google News. A lista canônica está em [Fontes](#fontes).
-- Categorias: Mundo, Boas notícias, Política, Economia, Tecnologia, Cyber & IA, Ciência, Educação, Saúde, Esportes, Cultura, Entretenimento e Meio Ambiente, inferidas por palavra-chave a partir do título/descrição.
+- Categorias: Mundo, Boas notícias, Política, Economia, Tecnologia, Cyber & IA, Ciência, Educação, Saúde, Esportes, Cultura, Entretenimento e Meio Ambiente, inferidas por palavra-chave a partir do título/descrição. **Boas notícias** é a exceção: descreve o veículo, não o assunto, então vem sempre da fonte — inferir por palavra-chave só conseguia esvaziá-la.
 - **Renderizada no servidor**: a home busca a visão padrão em `app/page.tsx` (Server Component) e entrega HTML com manchetes reais na primeira resposta — o painel interativo (`NewsDashboard`) hidrata sobre esses dados em vez de partir de uma tela vazia, o que melhora o LCP e mantém o conteúdo visível mesmo sem JavaScript.
 - **Agrupamento de notícias equivalentes**: a mesma notícia coberta por fontes diferentes (títulos e URLs distintos) é agrupada por similaridade de texto (`lib/clustering.ts`) em vez de aparecer duplicada; o card líder do grupo mostra um selo "N fontes" com as demais fontes no tooltip.
 - **Curadoria equilibrada na home**: a visão inicial (sem filtro) abre com um destaque leve e variado e mantém o topo diverso, sem começar por uma sequência de notícias pesadas — nada é escondido, só reordenado (`curateHomepage`). Ao pesquisar, filtrar ou entrar no modo ao vivo, a ordem cronológica/relevância é respeitada.
@@ -98,6 +98,8 @@ A interface é mobile-first com Tailwind (`sm:`/`md:`/`lg:`), testada em 320px, 
 | Poder360 | Política |
 | InfoMoney | Economia |
 | Exame | Economia |
+| Agência Brasil — Economia | Economia |
+| G1 — Economia | Economia |
 | Olhar Digital | Tecnologia |
 | Tecnoblog | Tecnologia |
 | Canaltech | Tecnologia |

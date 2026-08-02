@@ -51,6 +51,24 @@ export const FEED_SOURCES: FeedSource[] = [
     url: "https://exame.com/feed/",
     category: "Economia",
   },
+  // Two more for Economia, which had only InfoMoney and Exame — both business
+  // magazines. Agência Brasil brings the public-sector view and G1 the general
+  // one, so the category stops being two outlets with the same editorial angle.
+  //
+  // Both URLs follow the exact path pattern of feeds already in this list
+  // (agenciabrasil …/rss/<editoria>/feed.xml, g1 …/rss/g1/<editoria>/), which is
+  // why they are here without a live check — /api/health reports the truth after
+  // deploy, and a source that 403s shows up there rather than failing silently.
+  {
+    name: "Agência Brasil — Economia",
+    url: "https://agenciabrasil.ebc.com.br/rss/economia/feed.xml",
+    category: "Economia",
+  },
+  {
+    name: "G1 — Economia",
+    url: "https://g1.globo.com/rss/g1/economia/",
+    category: "Economia",
+  },
   {
     name: "Olhar Digital",
     url: "https://olhardigital.com.br/feed/",
