@@ -21,6 +21,8 @@
     "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "fast-xml-parser": "^5.10.1",
     "lucide-react": "^1.27.0",
     "next": "16.2.12",

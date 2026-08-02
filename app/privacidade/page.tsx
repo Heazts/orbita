@@ -45,11 +45,17 @@ export default function PrivacidadePage() {
       </div>
 
       <div>
-        <h2>Métricas de uso</h2>
+        <h2>Métricas de uso e desempenho</h2>
         <p>
           Usamos o Vercel Analytics para entender, de forma <strong>agregada e anônima</strong>, quantas
-          pessoas visitam a Órbita e quais páginas são mais acessadas. Ele não usa cookies de
-          rastreamento e não identifica você individualmente.
+          pessoas visitam a Órbita e quais páginas são mais acessadas, e o Vercel Speed Insights para
+          medir a velocidade real de carregamento das páginas — o tempo até a primeira imagem aparecer,
+          a estabilidade do layout e a resposta ao toque. Nenhum dos dois usa cookies de rastreamento
+          nem identifica você individualmente.
+        </p>
+        <p>
+          Os dois carregam do próprio domínio da Órbita, não de um servidor de terceiros, e é para lá
+          que as medições vão.
         </p>
       </div>
 
@@ -65,10 +71,15 @@ export default function PrivacidadePage() {
       <div>
         <h2>Conteúdo de terceiros</h2>
         <p>
-          As notícias, imagens e links vêm dos veículos originais (BBC, DW, Agência Brasil, G1, NASA e
-          outros). As imagens são carregadas diretamente dos servidores dessas fontes com a política
-          <code> no-referrer</code>, então não informamos a elas de onde você veio. Ao clicar em uma
-          notícia, você vai para o site do veículo, que tem sua própria política de privacidade.
+          As notícias, imagens e links vêm dos veículos originais (BBC Brasil, Agência Brasil, G1,
+          InfoMoney, NASA e outros — a lista completa está no{" "}
+          <a href="https://github.com/Heazts/orbita#fontes" target="_blank" rel="noopener noreferrer">
+            repositório
+          </a>
+          ). As imagens <strong>não</strong> são buscadas pelo seu navegador nos servidores desses
+          veículos: elas passam por um proxy da própria Órbita, então esses sites não recebem o seu
+          endereço IP nem sabem que você viu aquela matéria. Ao clicar em uma notícia, aí sim você vai
+          para o site do veículo, que tem sua própria política de privacidade.
         </p>
       </div>
 
