@@ -22,10 +22,22 @@ export function getCategoryBadgeStyle(lead = false): string {
     : "bg-transparent text-muted-foreground border border-border"
 }
 
+// Categories that describe the *outlet*, not the subject. A good-news feed is
+// good news whichever topic it covers, so topic keywords must not reclassify it.
+//
+// This is what emptied "Boas notícias": the category has one source, every rule
+// below matches on subject, and none of them can ever produce "Boas notícias".
+// A hopeful story about a doctor became Saúde, about a school became Educação,
+// about a discovery became Ciência — until the category the reader clicked had
+// nothing left in it. A tone is orthogonal to a topic; inferring one from the
+// other can only destroy it.
+const SOURCE_DEFINED_CATEGORIES = new Set<FeedSource["category"]>(["Boas notícias"])
+
 export function inferCategory(
   title: string,
   fallback: FeedSource["category"],
 ): FeedSource["category"] {
+  if (SOURCE_DEFINED_CATEGORIES.has(fallback)) return fallback
   const normalized = normalize(title)
   const rules: Array<{ test: RegExp; category: FeedSource["category"] }> = [
     // Cyber & AI runs first so a hacker/breach/AI story isn't swallowed by the

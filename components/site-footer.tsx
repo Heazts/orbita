@@ -1,6 +1,12 @@
 "use client"
 
 import Link from "next/link"
+import { OrbitaMark } from "@/components/ui/orbita-mark"
+
+// Shared by all six items so a <button> and an <a> render as the same box.
+// They read as one row of equivalent choices, so they have to sit on one line.
+const FOOTER_LINK =
+  "inline-flex items-center font-medium leading-none text-muted-foreground transition-colors hover:text-foreground rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 
 export function SiteFooter({ onOpenPreferences }: { onOpenPreferences: () => void }) {
   // Computed at render time, not at module load time, so cached production
@@ -11,51 +17,33 @@ export function SiteFooter({ onOpenPreferences }: { onOpenPreferences: () => voi
       <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 md:px-8 md:py-10">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div className="flex items-center gap-3">
-            <span className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-black text-primary-foreground">
-              O
-            </span>
+            <OrbitaMark className="size-8" />
             <div>
               <p className="font-serif text-sm font-bold text-foreground">Órbita</p>
               <p className="text-xs text-muted-foreground">Notícias do mundo ao vivo</p>
             </div>
           </div>
           <nav aria-label="Rodapé" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
-            <Link
-              href="/estudantes"
-              className="font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
+            <Link href="/estudantes" className={FOOTER_LINK}>
               Estudantes
             </Link>
-            <Link
-              href="/jogos"
-              className="font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
+            <Link href="/jogos" className={FOOTER_LINK}>
               Jogos
             </Link>
-            <button
-              type="button"
-              onClick={onOpenPreferences}
-              className="font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
+            <button type="button" onClick={onOpenPreferences} className={FOOTER_LINK}>
               Preferências
             </button>
-            <Link
-              href="/privacidade"
-              className="font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
+            <Link href="/privacidade" className={FOOTER_LINK}>
               Privacidade
             </Link>
-            <Link
-              href="/termos"
-              className="font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
+            <Link href="/termos" className={FOOTER_LINK}>
               Termos
             </Link>
             <a
               href="https://github.com/Heazts/orbita"
               target="_blank"
               rel="noopener noreferrer"
-              className="font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className={FOOTER_LINK}
             >
               GitHub
             </a>

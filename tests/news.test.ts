@@ -125,6 +125,39 @@ describe("inferCategory", () => {
     expect(inferCategory("Manchete genérica sem palavras-chave", "Mundo")).toBe("Mundo")
   })
 
+  // The bug that emptied the category: "Boas notícias" describes the outlet,
+  // not the subject. Every rule above matches on subject and none of them can
+  // ever produce "Boas notícias", so each keyword match stole an item away
+  // until the category the reader clicked had nothing left in it.
+  describe("Boas notícias is decided by the source, not the subject", () => {
+    const goodNews = [
+      "Médico cria projeto que leva vacina a ribeirinhos",
+      "Escola pública dobra aprovação no vestibular",
+      "Pesquisa brasileira encontra forma de limpar rios",
+      "Atleta doa prêmio de campeonato para o bairro onde cresceu",
+      "Festival de cinema arrecada toneladas de alimentos",
+      "Banco de alimentos amplia atendimento com nova sede",
+    ]
+
+    it("keeps every one of these in Boas notícias", () => {
+      for (const title of goodNews) {
+        expect(inferCategory(title, "Boas notícias"), title).toBe("Boas notícias")
+      }
+    })
+
+    it("would have reclassified all of them from any other source", () => {
+      // Same headlines, ordinary source: the keyword rules still apply, which
+      // is what makes the exception above necessary rather than cosmetic.
+      const moved = goodNews.filter((title) => inferCategory(title, "Mundo") !== "Mundo")
+      expect(moved).toHaveLength(goodNews.length)
+    })
+
+    it("does not disturb the other categories", () => {
+      expect(inferCategory("Banco Central sobe os juros", "Economia")).toBe("Economia")
+      expect(inferCategory("Campanha de vacina contra o vírus", "Mundo")).toBe("Saúde")
+    })
+  })
+
   it("routes cyber/AI stories to Cyber & IA before generic Tecnologia", () => {
     expect(inferCategory("Ransomware causa vazamento de dados de milhões", "Mundo")).toBe("Cyber & IA")
     expect(inferCategory("Nova inteligência artificial da OpenAI é lançada", "Tecnologia")).toBe("Cyber & IA")
