@@ -32,7 +32,10 @@ function resolveErrorCode(code: string): ErrorCode {
 export async function generateMetadata({ params }: ErrorPageProps): Promise<Metadata> {
   const { code } = await params
   return {
-    title: `Erro ${resolveErrorCode(code)} · Órbita`,
+    // No "· Órbita" here: the title template in app/layout.tsx appends the site
+    // name to any string title a page returns, and spelling it out as well
+    // rendered "Erro 500 · Órbita · Órbita" in the tab and in link previews.
+    title: `Erro ${resolveErrorCode(code)}`,
     robots: { index: false, follow: false },
   }
 }

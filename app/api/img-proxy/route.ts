@@ -3,6 +3,7 @@ import { request as httpsRequest } from "node:https"
 import { isIP } from "node:net"
 import { NextRequest, NextResponse } from "next/server"
 import { resolveRemoteImageUrl, type ResolvedRemoteUrl } from "@/lib/safe-remote-url"
+import { IMAGE_BUCKET, checkRateLimitDistributed, clientIp } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
 
@@ -141,6 +142,30 @@ async function fetchWithSafeRedirects(initialUrl: string): Promise<{ contentType
 }
 
 export async function GET(request: NextRequest) {
+  // The SSRF guards below decide *where* this may fetch; they say nothing about
+  // how often. Without a limit the route is an open relay: any caller can point
+  // it at any public HTTPS image and have this server pull up to MAX_IMAGE_BYTES
+  // on their behalf, with no account, no referrer check and a CDN entry keyed by
+  // their chosen URL. That is bandwidth and egress cost with someone else's hand
+  // on the tap, an anonymising fetcher wearing this deployment's addresses, and
+  // — through the distinct 502/415/504 replies below — a probe for which public
+  // HTTPS hosts answer. Counted in its own bucket so a page loading its
+  // thumbnails cannot exhaust the reader's /api/news budget, or vice versa.
+  const rate = await checkRateLimitDistributed(clientIp(request), Date.now(), IMAGE_BUCKET)
+  if (rate.limited) {
+    return new NextResponse("Muitas requisições", {
+      status: 429,
+      headers: {
+        "X-RateLimit-Limit": String(IMAGE_BUCKET.max),
+        "X-RateLimit-Remaining": "0",
+        "Retry-After": String(rate.retryAfterSeconds),
+        // A 429 is about this caller right now; caching it would hand the same
+        // rejection to everyone behind the CDN edge.
+        "Cache-Control": "private, no-store",
+      },
+    })
+  }
+
   const urlParam = request.nextUrl.searchParams.get("url")
   if (!urlParam) return new NextResponse("Parâmetro URL não informado", { status: 400 })
 

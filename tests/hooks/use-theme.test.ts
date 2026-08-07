@@ -38,6 +38,26 @@ describe("useTheme", () => {
     localStorage.clear()
   })
 
+  /**
+   * The theme is read from the <html> class through useSyncExternalStore rather
+   * than copied into state. Two consequences are load-bearing: the hydration
+   * render uses the server snapshot (null) so it cannot disagree with the
+   * server — see tests/theme-hydration.test.tsx, which exercises that path —
+   * and there is no second copy that can drift from the class actually applied.
+   */
+  it("tracks the class on <html> rather than a separate copy of it", async () => {
+    stubMatchMedia(false)
+    document.documentElement.classList.add("light")
+    const { result } = renderHook(() => useTheme())
+    await waitFor(() => expect(result.current.theme).toBe("light"))
+
+    // Whatever writes the class — this hook, or the boot script before it —
+    // is what the hook reports.
+    act(() => result.current.setMode("dark"))
+    expect(document.documentElement.classList.contains("dark")).toBe(true)
+    expect(result.current.theme).toBe("dark")
+  })
+
   it("reads the initial theme from the <html> class set by the inline script in layout.tsx", async () => {
     stubMatchMedia(true)
     document.documentElement.classList.add("dark")

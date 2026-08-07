@@ -84,7 +84,15 @@ export function useNewsFilters(addSearchTerm: (term: string) => void): NewsFilte
     query,
     apiUrl,
     isLivePeriod: period === "live",
-    isDefaultView: !query && category === "Todas" && period === "all" && source === "Todas",
+    // Must agree with the isDefaultView in lib/aggregate.ts, which decides
+    // whether the server applies curateHomepage. `sort` was missing here: with
+    // sort=relevance and no search this said "default", so the dashboard seeded
+    // SWR with the curated server payload and then received the uncurated one,
+    // visibly reshuffling the cards after first paint. It also picks between the
+    // "sources are down" and "your filters matched nothing" empty states, which
+    // that combination got wrong for the same reason.
+    isDefaultView:
+      !query && category === "Todas" && period === "all" && source === "Todas" && sort === "latest",
     clear,
   }
 }

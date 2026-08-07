@@ -1,11 +1,15 @@
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site"
-import { aggregateNews, DEFAULT_NEWS_QUERY } from "@/lib/aggregate"
+import { aggregateNewsCached, DEFAULT_NEWS_QUERY } from "@/lib/aggregate"
 import { escapeXml } from "@/lib/xml"
 
+// This one genuinely is static — a route handler, not a page under the layout
+// that reads the nonce — so revalidate applies here as written.
 export const revalidate = 300
 
 export async function GET() {
-  const { items } = await aggregateNews(DEFAULT_NEWS_QUERY)
+  // Same query as the home page, so the cached aggregate is shared rather than
+  // computed a second time on its own schedule.
+  const { items } = await aggregateNewsCached(DEFAULT_NEWS_QUERY)
 
   const itemsXml = items
     .slice(0, 50)
