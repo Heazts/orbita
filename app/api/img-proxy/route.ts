@@ -2,7 +2,12 @@ import type { IncomingHttpHeaders } from "node:http"
 import { request as httpsRequest } from "node:https"
 import { isIP } from "node:net"
 import { NextRequest, NextResponse } from "next/server"
-import { resolveRemoteImageUrl, type ResolvedRemoteUrl } from "@/lib/safe-remote-url"
+import {
+  UnsafeRemoteUrlError,
+  resolveRemoteImageUrl,
+  type ResolvedRemoteUrl,
+} from "@/lib/safe-remote-url"
+import { IMAGE_RATE_LIMIT, checkRateLimitDistributed, clientIp } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
 
@@ -141,6 +146,23 @@ async function fetchWithSafeRedirects(initialUrl: string): Promise<{ contentType
 }
 
 export async function GET(request: NextRequest) {
+  // Without this the route is an open outbound fetcher: any caller could make
+  // the server pull up to MAX_IMAGE_BYTES from any public HTTPS host, as often
+  // as they liked, with each distinct URL becoming its own week-long CDN entry.
+  // The budget is separate from the news one and sized from a real measurement
+  // — see IMAGE_RATE_LIMIT.
+  const rate = await checkRateLimitDistributed(clientIp(request), Date.now(), IMAGE_RATE_LIMIT)
+  if (rate.limited) {
+    return new NextResponse("Muitas requisições de imagem", {
+      status: 429,
+      headers: {
+        "Retry-After": String(rate.retryAfterSeconds),
+        "X-RateLimit-Limit": String(IMAGE_RATE_LIMIT.max),
+        "X-RateLimit-Remaining": "0",
+      },
+    })
+  }
+
   const urlParam = request.nextUrl.searchParams.get("url")
   if (!urlParam) return new NextResponse("Parâmetro URL não informado", { status: 400 })
 
@@ -165,7 +187,10 @@ export async function GET(request: NextRequest) {
     if (error instanceof RemoteImageStatusError) {
       return new NextResponse("Falha ao buscar imagem remota", { status: 502 })
     }
-    if (error instanceof Error && /URL|HTTPS|Host|Porta|Credenciais|Endereço/.test(error.message)) {
+    // Matched on the type, not on the wording: this used to test the message
+    // against /URL|HTTPS|Host|Porta|Credenciais|Endereço/, so rewording one of
+    // those errors would have quietly turned a 400 into a 504.
+    if (error instanceof UnsafeRemoteUrlError) {
       return new NextResponse("URL remota não permitida", { status: 400 })
     }
     return new NextResponse("Não foi possível buscar a imagem", { status: 504 })

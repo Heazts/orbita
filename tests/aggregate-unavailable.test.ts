@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { DEFAULT_NEWS_QUERY, aggregateNews } from "@/lib/aggregate"
+import { DEFAULT_NEWS_QUERY, aggregateNews, dedupeKey } from "@/lib/aggregate"
 import { FEED_SOURCES } from "@/lib/news"
 
 // unstable_cache wraps the loader in Next's request-scoped cache, which does not
@@ -50,6 +50,54 @@ describe("aggregateNews when every source fails", () => {
     allSourcesFail()
     const result = await aggregateNews(DEFAULT_NEWS_QUERY)
     expect("isFallback" in result).toBe(false)
+  })
+})
+
+describe("dedupeKey", () => {
+  // Tested directly rather than through aggregateNews: clustering merges items
+  // by title similarity before the dedup key would ever decide anything, so an
+  // end-to-end test here passes for the wrong reason.
+  it("folds the scheme and host, which are case-insensitive in a URL", () => {
+    expect(dedupeKey("HTTPS://Exemplo.test/a")).toBe(dedupeKey("https://exemplo.test/a"))
+  })
+
+  // item.url is also item.id, the key favourites are stored under in the
+  // reader's browser, so the item itself is never rewritten — only the key.
+  it("leaves the path alone, which is case-sensitive", () => {
+    expect(dedupeKey("https://exemplo.test/Artigo")).not.toBe(dedupeKey("https://exemplo.test/artigo"))
+  })
+
+  it("leaves the query alone, including the order of its parameters", () => {
+    expect(dedupeKey("https://x.test/a?b=2&a=1")).not.toBe(dedupeKey("https://x.test/a?a=1&b=2"))
+    expect(dedupeKey("https://x.test/a?B=2")).not.toBe(dedupeKey("https://x.test/a?b=2"))
+  })
+
+  it("keeps different paths apart", () => {
+    expect(dedupeKey("https://x.test/1")).not.toBe(dedupeKey("https://x.test/2"))
+  })
+
+  it("keeps different hosts apart", () => {
+    expect(dedupeKey("https://a.test/x")).not.toBe(dedupeKey("https://b.test/x"))
+  })
+
+  it("drops the fragment, which never identifies a different article", () => {
+    expect(dedupeKey("https://x.test/a#topo")).toBe(dedupeKey("https://x.test/a"))
+  })
+
+  it("falls back to the raw string when the URL cannot be parsed", () => {
+    expect(dedupeKey("nao é uma url")).toBe("nao é uma url")
+  })
+})
+
+describe("aggregateNews keeps the URL its feed published", () => {
+  it("never rewrites item.url or item.id", async () => {
+    vi.stubGlobal("fetch", async () =>
+      new Response(feedXml("Matéria", "HTTPS://Exemplo.test/Caminho?B=2&a=1"), { status: 200 }),
+    )
+
+    const [item] = (await aggregateNews(DEFAULT_NEWS_QUERY)).items
+    expect(item.url).toBe("HTTPS://Exemplo.test/Caminho?B=2&a=1")
+    expect(item.id).toBe(item.url)
   })
 })
 

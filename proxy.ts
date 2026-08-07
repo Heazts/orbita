@@ -23,7 +23,12 @@ function buildCsp(nonce: string): string {
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}'${isDev ? ` 'unsafe-eval' ${DEV_ANALYTICS_HOST}` : ""}`,
     "style-src 'self'",
-    "img-src 'self' data: blob: https:",
+    // No third-party host: components/ui/news-image.tsx routes every remote
+    // image through /api/img-proxy, which is same-origin, so a broad `https:`
+    // only widened what an injected tag could reach. If a future component
+    // points an <img> straight at an outlet, it breaks here — visibly, which is
+    // the point.
+    "img-src 'self' data: blob:",
     "font-src 'self' data:",
     `connect-src 'self'${isDev ? " ws:" : ""}`,
     // The service worker (public/sw.js) and the PWA manifest are same-origin.

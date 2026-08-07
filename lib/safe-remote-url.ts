@@ -1,6 +1,20 @@
 import { lookup } from "node:dns/promises"
 import { isIP } from "node:net"
 
+/**
+ * Raised when a URL is refused before any network call.
+ *
+ * A type, not a message: app/api/img-proxy/route.ts used to decide the status
+ * code by regex-matching the Portuguese text of these errors, so rewording one
+ * of them — or translating the file — would silently turn a 400 into a 504.
+ */
+export class UnsafeRemoteUrlError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "UnsafeRemoteUrlError"
+  }
+}
+
 const MAX_URL_LENGTH = 2_048
 const BLOCKED_HOST_SUFFIXES = [".localhost", ".local", ".internal", ".home.arpa"]
 
@@ -124,18 +138,18 @@ export async function resolveRemoteImageUrl(
   input: string,
   resolver: HostResolver = resolveHostname,
 ): Promise<ResolvedRemoteUrl> {
-  if (!input || input.length > MAX_URL_LENGTH) throw new Error("URL inválida")
+  if (!input || input.length > MAX_URL_LENGTH) throw new UnsafeRemoteUrlError("URL inválida")
 
   let url: URL
   try {
     url = new URL(input)
   } catch {
-    throw new Error("URL inválida")
+    throw new UnsafeRemoteUrlError("URL inválida")
   }
 
-  if (url.protocol !== "https:") throw new Error("Apenas HTTPS é permitido")
-  if (url.username || url.password) throw new Error("Credenciais na URL não são permitidas")
-  if (url.port && url.port !== "443") throw new Error("Porta não permitida")
+  if (url.protocol !== "https:") throw new UnsafeRemoteUrlError("Apenas HTTPS é permitido")
+  if (url.username || url.password) throw new UnsafeRemoteUrlError("Credenciais na URL não são permitidas")
+  if (url.port && url.port !== "443") throw new UnsafeRemoteUrlError("Porta não permitida")
 
   const hostname = url.hostname.replace(/^\[|\]$/g, "").replace(/\.$/, "").toLowerCase()
   if (
@@ -143,18 +157,18 @@ export async function resolveRemoteImageUrl(
     hostname === "localhost" ||
     BLOCKED_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix))
   ) {
-    throw new Error("Host não permitido")
+    throw new UnsafeRemoteUrlError("Host não permitido")
   }
 
   const addresses = isIP(hostname) ? [hostname] : await resolver(hostname)
   const normalizedAddresses = addresses.map(normalizeAddress)
   if (normalizedAddresses.length === 0 || normalizedAddresses.some(isPrivateOrReservedIp)) {
-    throw new Error("Endereço de rede não permitido")
+    throw new UnsafeRemoteUrlError("Endereço de rede não permitido")
   }
 
   const address = normalizedAddresses[0]
   const family = isIP(address)
-  if (family !== 4 && family !== 6) throw new Error("Endereço de rede inválido")
+  if (family !== 4 && family !== 6) throw new UnsafeRemoteUrlError("Endereço de rede inválido")
 
   url.hash = ""
   return { url, address, family }

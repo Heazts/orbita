@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { REPORT_RATE_LIMIT, checkRateLimitDistributed, clientIp } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
 
@@ -51,6 +52,18 @@ async function readCappedBody(request: NextRequest): Promise<string | null> {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // The body is already capped and sanitised, so what is left to bound is
+  // volume: an unauthenticated endpoint that writes a log line per call is a
+  // cheap way to run up log ingestion and bury real violations in noise.
+  const rate = await checkRateLimitDistributed(clientIp(request), Date.now(), REPORT_RATE_LIMIT)
+  // 429 rather than a silent 204: a browser that is being dropped should know.
+  if (rate.limited) {
+    return new NextResponse(null, {
+      status: 429,
+      headers: { "Retry-After": String(rate.retryAfterSeconds) },
+    })
+  }
+
   const raw = await readCappedBody(request)
   if (raw === null) return new NextResponse(null, { status: 413 })
 

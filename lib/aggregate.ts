@@ -66,6 +66,26 @@ async function searchGoogle(query: string): Promise<NewsItem[]> {
   return parseFeed(xml, { name: "Google News", url, category: "Mundo" }, true)
 }
 
+/**
+ * Key two links are "the same story" under.
+ *
+ * Only the scheme and host are case-insensitive in a URL, so those are lowered
+ * and the path and query are left exactly as the feed published them. Comparing
+ * the raw string treated HTTPS://x and https://x as two separate stories.
+ *
+ * This is used for the key alone — never to rewrite the item. `item.url` is also
+ * `item.id`, which is the key favourites are stored under in the reader's
+ * browser, so normalising the item itself would orphan every saved favourite.
+ */
+export function dedupeKey(url: string): string {
+  try {
+    const parsed = new URL(url)
+    return `${parsed.protocol.toLowerCase()}//${parsed.host.toLowerCase()}${parsed.pathname}${parsed.search}`
+  } catch {
+    return url
+  }
+}
+
 export type NewsQuery = {
   query: string
   category: string
@@ -115,7 +135,7 @@ export async function aggregateNews({ query, category, source, period, sort }: N
 
   // Score and parse each item once, then filter/sort on the precomputed values
   // instead of recomputing relevance() inside the sort comparator.
-  const sorted = Array.from(new Map(combined.map((item) => [item.url, item])).values())
+  const sorted = Array.from(new Map(combined.map((item) => [dedupeKey(item.url), item])).values())
     .map((item) => {
       // Undated items (publishedAt === "") parse to NaN; map that to -Infinity so
       // they sort last under "mais recentes" and never satisfy the live/period

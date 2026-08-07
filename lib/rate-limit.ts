@@ -7,6 +7,40 @@ import { isIP } from "node:net"
 export const RATE_LIMIT_WINDOW_MS = 60_000
 export const RATE_LIMIT_MAX_REQUESTS = 30
 
+/**
+ * One budget per kind of work, because the routes cost different amounts and a
+ * reader uses them at very different rates.
+ *
+ * Sharing a single counter would have been worse than no limit at all on the
+ * image proxy: measured in a real browser against the production build, opening
+ * the home page requests 6 images and scrolling the whole list requests 100 —
+ * one per card. A reader would have exhausted a 30/minute budget a third of the
+ * way down the page and seen the rest as broken thumbnails.
+ */
+export type RateLimitRule = {
+  /** Keeps one route's counter from draining another's. */
+  bucket: string
+  /** Requests allowed per window, per client. */
+  max: number
+}
+
+/** Search and feed reads. Also covers /api/health, which reads the same cache. */
+export const NEWS_RATE_LIMIT: RateLimitRule = { bucket: "news", max: RATE_LIMIT_MAX_REQUESTS }
+
+/**
+ * The image proxy. 300 allows three full passes over the list in a minute —
+ * more than anyone reads — while still bounding what one address can pull
+ * through the proxy.
+ */
+export const IMAGE_RATE_LIMIT: RateLimitRule = { bucket: "img", max: 300 }
+
+/**
+ * CSP violation reports and the finance quotes. Browsers send violations in
+ * bursts, so this is deliberately loose: the point is to bound log volume and
+ * cost, not to police a legitimate client.
+ */
+export const REPORT_RATE_LIMIT: RateLimitRule = { bucket: "report", max: 60 }
+
 const requestLog = new Map<string, number[]>()
 const MAX_TRACKED_CLIENTS = 10_000
 let lastCleanupAt = 0
@@ -48,13 +82,20 @@ export type RateLimitResult = {
   retryAfterSeconds: number
 }
 
-export function checkRateLimit(clientId: string, now: number = Date.now()): RateLimitResult {
+export function checkRateLimit(
+  clientId: string,
+  now: number = Date.now(),
+  rule: RateLimitRule = NEWS_RATE_LIMIT,
+): RateLimitResult {
+  // Namespaced so /api/img-proxy and /api/news count separately for the same
+  // address.
+  const key = `${rule.bucket}:${clientId}`
   // clientIp() returns a fresh unknown-<uuid> per call when no IP header is
   // present. Storing those keys would leak memory (each entry lives for the
   // whole window but can never be revisited), so short-circuit here — the
   // effective outcome is identical to a first-and-only hit.
   if (clientId.startsWith("unknown-")) {
-    return { limited: false, remaining: RATE_LIMIT_MAX_REQUESTS - 1, retryAfterSeconds: 0 }
+    return { limited: false, remaining: rule.max - 1, retryAfterSeconds: 0 }
   }
 
   // Remove expired buckets periodically and cap the map even within a single
@@ -69,26 +110,30 @@ export function checkRateLimit(clientId: string, now: number = Date.now()): Rate
     lastCleanupAt = now
   }
 
-  const knownClient = requestLog.has(clientId)
+  const knownClient = requestLog.has(key)
   if (!knownClient && requestLog.size >= MAX_TRACKED_CLIENTS) {
     const oldestClient = requestLog.keys().next().value
     if (oldestClient !== undefined) requestLog.delete(oldestClient)
   }
 
-  const recent = (requestLog.get(clientId) ?? []).filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS)
+  const recent = (requestLog.get(key) ?? []).filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS)
   recent.push(now)
   // Refresh insertion order so the bounded map evicts the least recently seen
   // client when it reaches capacity.
-  if (knownClient) requestLog.delete(clientId)
-  requestLog.set(clientId, recent)
-  const limited = recent.length > RATE_LIMIT_MAX_REQUESTS
-  const remaining = Math.max(0, RATE_LIMIT_MAX_REQUESTS - recent.length)
+  if (knownClient) requestLog.delete(key)
+  requestLog.set(key, recent)
+  const limited = recent.length > rule.max
+  const remaining = Math.max(0, rule.max - recent.length)
   const retryAfterSeconds = limited ? Math.max(1, Math.ceil((RATE_LIMIT_WINDOW_MS - (now - recent[0])) / 1000)) : 0
   return { limited, remaining, retryAfterSeconds }
 }
 
-export function isRateLimited(clientId: string, now: number = Date.now()): boolean {
-  return checkRateLimit(clientId, now).limited
+export function isRateLimited(
+  clientId: string,
+  now: number = Date.now(),
+  rule: RateLimitRule = NEWS_RATE_LIMIT,
+): boolean {
+  return checkRateLimit(clientId, now, rule).limited
 }
 
 // Exposed for tests so state doesn't leak between cases.
@@ -156,15 +201,16 @@ async function upstashPipeline(commands: (string | number)[][]): Promise<unknown
 export async function checkRateLimitDistributed(
   clientId: string,
   now: number = Date.now(),
+  rule: RateLimitRule = NEWS_RATE_LIMIT,
 ): Promise<RateLimitResult> {
   // Clients with no identifying IP get a unique key per request (see clientIp),
   // so a shared counter is meaningless — skip Redis and use the local path.
   if (!isDistributedRateLimitEnabled() || clientId.startsWith("unknown-")) {
-    return checkRateLimit(clientId, now)
+    return checkRateLimit(clientId, now, rule)
   }
 
   const windowStart = Math.floor(now / RATE_LIMIT_WINDOW_MS)
-  const key = `orbita:rl:${clientId}:${windowStart}`
+  const key = `orbita:rl:${rule.bucket}:${clientId}:${windowStart}`
   // INCR creates the key at 1 on the first hit; PEXPIRE bounds its lifetime to
   // the window so stale keys clean themselves up.
   const results = await upstashPipeline([
@@ -173,10 +219,10 @@ export async function checkRateLimitDistributed(
   ])
 
   const count = results && typeof results[0] === "number" ? results[0] : null
-  if (count === null) return checkRateLimit(clientId, now)
+  if (count === null) return checkRateLimit(clientId, now, rule)
 
-  const limited = count > RATE_LIMIT_MAX_REQUESTS
-  const remaining = Math.max(0, RATE_LIMIT_MAX_REQUESTS - count)
+  const limited = count > rule.max
+  const remaining = Math.max(0, rule.max - count)
   const windowEnd = (windowStart + 1) * RATE_LIMIT_WINDOW_MS
   const retryAfterSeconds = limited ? Math.max(1, Math.ceil((windowEnd - now) / 1000)) : 0
   return { limited, remaining, retryAfterSeconds }
