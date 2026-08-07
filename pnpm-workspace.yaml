@@ -1,5 +1,10 @@
 overrides:
   brace-expansion: "^5.0.9"
+  # GHSA-5p4m-2wfm-xmqj (high) affects js-yaml 4.3.0, which arrives transitively
+  # through eslint-config-next -> eslint -> @eslint/eslintrc. Dev-only tooling
+  # that never reaches the browser or the server runtime, but OSV-Scanner gates
+  # on it and a known-vulnerable version is not worth carrying for a patch bump.
+  js-yaml: "^4.3.1"
   postcss: "^8.5.25"
   sharp: "^0.35.0"
 patchedDependencies:
