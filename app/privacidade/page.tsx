@@ -69,9 +69,20 @@ export default function PrivacidadePage() {
         <h2>Endereço IP e proteção contra abuso</h2>
         <p>
           Quando o app busca notícias na nossa API, seu endereço IP é usado momentaneamente apenas para
-          limitar as requisições a cerca de 30 por minuto e evitar abuso. Esse controle é feito em
-          memória, o registro expira sozinho ao fim de cada janela de um minuto, e não guardamos
-          nenhum histórico persistente do seu IP.
+          limitar as requisições a cerca de 30 por minuto e evitar abuso. O mesmo vale para as imagens
+          das notícias, que passam pelo nosso proxy e têm um limite próprio e mais alto. O registro
+          expira sozinho ao fim de cada janela de um minuto e não guardamos nenhum histórico
+          persistente do seu IP.
+        </p>
+        <p>
+          Esse contador fica na memória do servidor. Em produção, quando o site roda em mais de uma
+          instância ao mesmo tempo, ele pode ficar em um serviço de cache externo (o{" "}
+          <a href="https://upstash.com/" target="_blank" rel="noopener noreferrer">
+            Upstash Redis
+          </a>
+          ), para que o limite valha no total e não por instância. Nesse caso seu IP é enviado a esse
+          serviço apenas como chave do contador, com o mesmo prazo de expiração de um minuto. Nenhuma
+          outra informação sua é enviada junto.
         </p>
       </div>
 

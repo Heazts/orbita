@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowLeft, Gamepad2 } from "lucide-react"
-import { aggregateNews, DEFAULT_NEWS_QUERY } from "@/lib/aggregate"
+import { aggregateNewsCached, DEFAULT_NEWS_QUERY } from "@/lib/aggregate"
 import { StudentResources } from "@/components/student-resources"
 import { StudentNewsList } from "@/components/student-news-list"
 
@@ -12,10 +12,10 @@ export const metadata: Metadata = {
   alternates: { canonical: "/estudantes" },
 }
 
-export const revalidate = 300
-
+// No `export const revalidate`: the nonce in app/layout.tsx makes this route
+// dynamic, so page-level revalidation never applied. See app/page.tsx.
 export default async function EstudantesPage() {
-  const { items } = await aggregateNews({ ...DEFAULT_NEWS_QUERY, category: "Educação" })
+  const { items } = await aggregateNewsCached({ ...DEFAULT_NEWS_QUERY, category: "Educação" })
 
   return (
     <div className="min-h-screen bg-background text-foreground">

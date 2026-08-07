@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { checkSourcesHealth } from "@/lib/health"
-import { RATE_LIMIT_MAX_REQUESTS, checkRateLimitDistributed, clientIp } from "@/lib/rate-limit"
+import { NEWS_BUCKET, checkRateLimitDistributed, clientIp } from "@/lib/rate-limit"
 
 // Reads through the same 5-minute feed cache the pages use, so this endpoint
 // adds no load on the outlets no matter how often it is polled, and reports the
@@ -17,14 +17,14 @@ export const revalidate = 300
  * end to ignore the alert.
  */
 export async function GET(request: NextRequest) {
-  const rate = await checkRateLimitDistributed(clientIp(request))
+  const rate = await checkRateLimitDistributed(clientIp(request), Date.now(), NEWS_BUCKET)
   if (rate.limited) {
     return NextResponse.json(
       { error: "Muitas requisições. Tente novamente em instantes." },
       {
         status: 429,
         headers: {
-          "X-RateLimit-Limit": String(RATE_LIMIT_MAX_REQUESTS),
+          "X-RateLimit-Limit": String(NEWS_BUCKET.max),
           "X-RateLimit-Remaining": "0",
           "Retry-After": String(rate.retryAfterSeconds),
         },

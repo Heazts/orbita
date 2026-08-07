@@ -15,6 +15,10 @@ import type { Sort } from "@/lib/types"
 // exhaust memory. The abort timeouts bound download time; this bounds size.
 const MAX_FEED_BYTES = 5_000_000
 
+// How many items reach the clustering pass. See the call site for why this
+// bound exists and why 300 is enough to feed a 100-item list.
+const CLUSTER_INPUT_LIMIT = 300
+
 async function readCapped(response: Response, maxBytes: number, label: string): Promise<string> {
   const reader = response.body?.getReader()
   // No streaming body available (shouldn't happen with Node's fetch/undici):
@@ -133,7 +137,19 @@ export async function aggregateNews({ query, category, source, period, sort }: N
   // Collapse the same story reported by different outlets under different
   // URLs/headlines (exact-URL dedup above only catches identical links) before
   // capping the list, so the 100-item limit isn't spent on duplicates.
-  const clustered = toClusteredItems(sorted)
+  //
+  // Bounded first, because clustering compares each item against every cluster
+  // built so far. When headlines are mostly distinct — the normal case — almost
+  // every item forms its own cluster and the work is quadratic in the input:
+  // measured at 135ms for 1000 items and 578ms for 2000, against the ~900-1400
+  // these feeds return together. That ran on the request path and blocked the
+  // event loop for every concurrent request on the instance.
+  //
+  // The list is already newest-first, so the 100 items that survive can only
+  // come from the head of it. CLUSTER_INPUT_LIMIT keeps a wide margin above
+  // that for the dedup to work with: outlets covering the same story publish
+  // within minutes of each other, so their entries sit close together here.
+  const clustered = toClusteredItems(sorted.slice(0, CLUSTER_INPUT_LIMIT))
   const unique = clustered.slice(0, 100)
 
   // Only the untouched homepage view gets tone/diversity curation. The moment
@@ -155,3 +171,27 @@ export async function aggregateNews({ query, category, source, period, sort }: N
     ...(failedSources.length ? { failedSources } : {}),
   }
 }
+
+/**
+ * aggregateNews with its *result* cached, for callers whose query is a fixed
+ * constant.
+ *
+ * loadFeedCached above only spares the network fetch and the XML parse. Everything
+ * after it — dedup, scoring, four filters, the sort, clustering and the homepage
+ * curation — still ran per request. That was invisible because both pages declare
+ * `revalidate`, but reading the nonce header in app/layout.tsx makes every route
+ * using that layout dynamic, so Next serves them `Cache-Control: no-store` and the
+ * declaration never applied. Every visitor to the home page paid for the whole
+ * pipeline to produce a response identical to the one the previous visitor got.
+ *
+ * Deliberately NOT used by app/api/news/route.ts, for two reasons that both matter:
+ * the query there is reader-supplied, so caching on it would mint an unbounded set
+ * of cache entries keyed by attacker-chosen text; and live mode sets `no-cache` on
+ * purpose so its 30-second poll returns fresh data. That route keeps its CDN
+ * s-maxage, which already collapses repeated identical searches.
+ */
+export const aggregateNewsCached = unstable_cache(
+  aggregateNews,
+  ["orbita-aggregate"],
+  { revalidate: 300 },
+)

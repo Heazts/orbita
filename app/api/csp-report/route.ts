@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { CSP_REPORT_BUCKET, checkRateLimitDistributed, clientIp } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
 
@@ -51,6 +52,22 @@ async function readCappedBody(request: NextRequest): Promise<string | null> {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // Unauthenticated, and every accepted report writes up to
+  // MAX_REPORTS_PER_REQUEST lines to the platform log. The body is already
+  // capped and sanitised; what was missing is a cap on how often. Log volume is
+  // billed, and this is the same channel /api/health and the ingest cron use to
+  // report dead feeds — drowning it in forged violations buries the signals
+  // that are worth reading.
+  const rate = await checkRateLimitDistributed(clientIp(request), Date.now(), CSP_REPORT_BUCKET)
+  // 429 with no body: a browser's reporting queue is fire-and-forget and reads
+  // nothing back, so there is nothing useful to say.
+  if (rate.limited) {
+    return new NextResponse(null, {
+      status: 429,
+      headers: { "Retry-After": String(rate.retryAfterSeconds) },
+    })
+  }
+
   const raw = await readCappedBody(request)
   if (raw === null) return new NextResponse(null, { status: 413 })
 

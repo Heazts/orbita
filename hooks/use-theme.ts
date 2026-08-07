@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react"
 import { writeStore } from "@/lib/storage"
 
 export type Theme = "light" | "dark"
@@ -25,6 +25,21 @@ const THEME_COLOR: Record<Theme, string> = {
   dark: "#111111",
 }
 
+// The class on <html> is the source of truth for the painted theme: the boot
+// script in app/layout.tsx sets it before React exists, and applyClass below is
+// the only other writer. That makes it an external store, which is why the hook
+// reads it through useSyncExternalStore rather than mirroring it into state.
+//
+// Subscribers are notified synchronously from applyClass. A MutationObserver
+// would be the more general way to watch the attribute, but its callback is a
+// microtask, so a theme flip would land a tick after the click that caused it.
+const themeListeners = new Set<() => void>()
+
+function subscribeToTheme(onStoreChange: () => void): () => void {
+  themeListeners.add(onStoreChange)
+  return () => themeListeners.delete(onStoreChange)
+}
+
 function applyClass(theme: Theme): void {
   const root = document.documentElement
   // Suppress CSS transitions while the theme flips: many surfaces have
@@ -47,17 +62,31 @@ function applyClass(theme: Theme): void {
   // old/new colour flash this class exists to prevent.
   window.clearTimeout(themeSwitchTimeout)
   themeSwitchTimeout = window.setTimeout(() => root.classList.remove("theme-switching"), 200)
+  for (const listener of themeListeners) listener()
 }
 
 // Module scope because applyTheme is a plain function shared by every caller,
 // not a hook with its own instance state.
 let themeSwitchTimeout: number | undefined
 
-// The boot script in app/layout.tsx applies the right class before hydration;
-// reading it back keeps the first client render consistent with the DOM.
-function getInitialTheme(): Theme {
-  if (typeof document === "undefined") return "light"
+/** The theme the page is currently painted in, read from the DOM. */
+function getThemeSnapshot(): Theme {
   return document.documentElement.classList.contains("dark") ? "dark" : "light"
+}
+
+/**
+ * What the server, and the client's hydration render, see instead.
+ *
+ * null rather than a guess. The previous code read the <html> class during
+ * render, so the server (no document) produced "light" while the client (boot
+ * script already run) produced "dark", and React rejected the mismatched tree
+ * with error #418 for every reader on a dark device — reproduced in a browser
+ * against a production build. React uses this snapshot for the hydration render
+ * and switches to the live one immediately after, which is exactly the sequence
+ * that makes the two agree.
+ */
+function getServerThemeSnapshot(): null {
+  return null
 }
 
 function getInitialMode(): ThemeMode {
@@ -72,19 +101,33 @@ function getInitialMode(): ThemeMode {
 }
 
 export function useTheme(): {
-  theme: Theme
+  /**
+   * null until hydration, then the theme the page is actually painted in.
+   *
+   * The server cannot know this — it depends on localStorage and the device's
+   * colour-scheme preference — so it must not guess. The server render and the
+   * client's hydration render both see null and agree; React then switches to
+   * the live snapshot. Consumers render something theme-neutral for null. Same
+   * shape as useNow(), which returns null pre-hydration for the same reason.
+   */
+  theme: Theme | null
   mode: ThemeMode
   setMode: (mode: ThemeMode) => void
   toggleTheme: () => void
 } {
-  const [theme, setTheme] = useState<Theme>(getInitialTheme)
+  // Derived from the DOM, not mirrored into state: applyClass is the only
+  // writer, and it notifies subscribers synchronously, so there is no second
+  // copy of the theme that can drift from the class actually on <html>.
+  const theme = useSyncExternalStore(subscribeToTheme, getThemeSnapshot, getServerThemeSnapshot)
+  // Mode is not part of the server-rendered markup — the preferences panel is
+  // closed on first paint and lazily loaded — so reading it during render is
+  // safe and cannot mismatch.
   const [mode, setModeState] = useState<ThemeMode>(getInitialMode)
 
   const setMode = useCallback((next: ThemeMode) => {
     setModeState(next)
-    const resolved = resolve(next)
-    applyClass(resolved)
-    setTheme(resolved)
+    // applyClass writes the class and notifies, which is what updates `theme`.
+    applyClass(resolve(next))
     writeStore(STORAGE_KEY, next)
   }, [])
 
@@ -92,19 +135,19 @@ export function useTheme(): {
   useEffect(() => {
     if (mode !== "system") return
     const query = window.matchMedia("(prefers-color-scheme: dark)")
-    const onChange = () => {
-      const resolved: Theme = query.matches ? "dark" : "light"
-      applyClass(resolved)
-      setTheme(resolved)
-    }
+    const onChange = () => applyClass(query.matches ? "dark" : "light")
     query.addEventListener("change", onChange)
     return () => query.removeEventListener("change", onChange)
   }, [mode])
 
   // The header button stays a quick one-tap switch: it always sets an explicit
   // theme (overriding "system"), which is what a tap on a sun/moon icon means.
+  //
+  // Falls back to reading the DOM when theme is still null. A tap can only
+  // happen after hydration in practice, but resolving it here means the toggle
+  // can never flip to the theme the reader is already looking at.
   const toggleTheme = useCallback(() => {
-    setMode(theme === "dark" ? "light" : "dark")
+    setMode((theme ?? getThemeSnapshot()) === "dark" ? "light" : "dark")
   }, [theme, setMode])
 
   return { theme, mode, setMode, toggleTheme }

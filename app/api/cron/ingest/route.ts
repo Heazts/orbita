@@ -7,11 +7,17 @@ export const revalidate = 0
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret) {
-    return NextResponse.json({ success: false, error: "Cron não configurado" }, { status: 503 })
-  }
 
-  if (!validBearerToken(request.headers.get("authorization"), cronSecret)) {
+  // Authenticate first, and answer a missing secret exactly like a wrong one.
+  // Reporting "Cron não configurado" before checking the token told any
+  // anonymous caller whether this deployment has CRON_SECRET set, which is a
+  // deployment detail they have no reason to learn. Still fails closed: with no
+  // secret, validBearerToken can never return true.
+  if (!cronSecret || !validBearerToken(request.headers.get("authorization"), cronSecret)) {
+    // A missing secret is an operator mistake, not a caller's, and it means this
+    // job has silently done nothing since deploy. Log it where the platform's
+    // alerting can see it — the same channel the failed-source report uses.
+    if (!cronSecret) console.error("[cron-ingest] CRON_SECRET is not configured; ingest cannot run")
     return new NextResponse("Não autorizado", { status: 401 })
   }
 

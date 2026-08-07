@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 import { FEED_SOURCES } from "@/lib/news"
-import { RATE_LIMIT_MAX_REQUESTS } from "@/lib/rate-limit"
+import { IMAGE_BUCKET, NEWS_BUCKET, RATE_LIMIT_MAX_REQUESTS } from "@/lib/rate-limit"
 
 /**
  * The privacy page makes factual claims about what the site does. Those claims
@@ -23,6 +23,7 @@ const terms = readFileSync(new URL("../app/termos/page.tsx", import.meta.url), "
 const layout = readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8")
 const newsImage = readFileSync(new URL("../components/ui/news-image.tsx", import.meta.url), "utf8")
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"))
+const rateLimitSource = readFileSync(new URL("../lib/rate-limit.ts", import.meta.url), "utf8")
 
 describe("privacy page claims match the code", () => {
   it("only names outlets that are actually sources", () => {
@@ -71,6 +72,83 @@ describe("privacy page claims match the code", () => {
     expect(RATE_LIMIT_MAX_REQUESTS).toBe(30)
     expect(privacy).toContain("30 por minuto")
   })
+
+  /**
+   * The page said the IP counter was kept "em memória" and that no persistent
+   * history was retained. The second half was true; the first was not, once
+   * lib/rate-limit.ts grew an Upstash Redis path. With those env vars set the
+   * reader's IP is the key of a counter held by a third-party service — which
+   * the page described nowhere, while the section above it promises that stored
+   * data never reaches "nós nem terceiros".
+   */
+  it("discloses the external store whenever the code can send an IP to one", () => {
+    const supportsExternalStore = rateLimitSource.includes("UPSTASH_REDIS_REST_URL")
+    if (!supportsExternalStore) return
+    expect(privacy, "the Upstash path exists but /privacidade never mentions it").toContain("Upstash")
+    expect(
+      privacy,
+      "/privacidade still claims the counter is in memory, which is false when Upstash is configured",
+    ).not.toMatch(/controle é feito em\s+memória/)
+  })
+
+  it("names the image proxy's separate, higher limit rather than implying one budget", () => {
+    expect(IMAGE_BUCKET.max).toBeGreaterThan(NEWS_BUCKET.max)
+    expect(privacy).toContain("limite próprio")
+  })
+})
+
+/**
+ * Every route that can be driven by an anonymous caller has to be metered. This
+ * is a sweep rather than a per-route test on purpose: the two endpoints that
+ * were unlimited (/api/img-proxy and /api/csp-report) were not forgotten by
+ * someone who considered them, they were simply never revisited after being
+ * added. A test that enumerates the directory catches the next one too.
+ */
+describe("every public API route is rate limited", () => {
+  const EXEMPT = new Set([
+    // Runs on a schedule behind a bearer secret, not on reader traffic.
+    "cron/ingest",
+    // Statically rendered: it takes no request input, so Next prerenders it and
+    // revalidates on a timer. Reader traffic is served from that copy and never
+    // reaches the upstream quote lookup, so there is no per-request work to
+    // meter. Guarded below, because that is only true while it stays static.
+    "finance",
+  ])
+
+  it("keeps /api/finance static, which is the reason it needs no limiter", () => {
+    const source = readFileSync(new URL("../app/api/finance/route.ts", import.meta.url), "utf8")
+    // Taking a request argument would make it dynamic, and then every call
+    // would hit the external API — at which point it needs a limiter like the
+    // rest and must come off the exempt list above.
+    expect(source).toMatch(/export async function GET\(\s*\)/)
+    expect(source).toMatch(/export const revalidate/)
+  })
+
+  function routeFiles(): string[] {
+    const found: string[] = []
+    const walk = (dir: URL, prefix: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) walk(new URL(`${entry.name}/`, dir), `${prefix}${entry.name}/`)
+        else if (entry.name === "route.ts") found.push(prefix.replace(/\/$/, ""))
+      }
+    }
+    walk(new URL("../app/api/", import.meta.url), "")
+    return found.sort()
+  }
+
+  it("finds the routes it is meant to be checking", () => {
+    // A broken walk would make every assertion below vacuously pass.
+    expect(routeFiles()).toContain("news")
+    expect(routeFiles()).toContain("img-proxy")
+  })
+
+  it.each(routeFiles().filter((route) => !EXEMPT.has(route)))(
+    "/api/%s calls the rate limiter",
+    (route) => {
+      const source = readFileSync(new URL(`../app/api/${route}/route.ts`, import.meta.url), "utf8")
+      expect(source).toMatch(/checkRateLimit(Distributed)?\(/)
+    },
+  )
 })
 
 /**
@@ -106,8 +184,10 @@ describe("privacy page discloses every stored key", () => {
       }
     }
     for (const dir of SOURCE_DIRS) walk(new URL(`../${dir}/`, import.meta.url))
-    // Not localStorage: the server-side cache tag for parsed feeds.
+    // Not localStorage: server-side cache tags, which share the prefix but
+    // never touch the reader's browser and so have nothing to disclose.
     keys.delete("orbita-feed")
+    keys.delete("orbita-aggregate")
     return [...keys].sort()
   }
 

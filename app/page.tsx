@@ -1,9 +1,12 @@
 import { NewsDashboard } from "@/components/news-dashboard"
-import { aggregateNews, DEFAULT_NEWS_QUERY } from "@/lib/aggregate"
+import { aggregateNewsCached, DEFAULT_NEWS_QUERY } from "@/lib/aggregate"
 
-// Matches the API route's window so both share loadFeedCached's cache entry
-// instead of each imposing its own revalidation schedule.
-export const revalidate = 300
+// No `export const revalidate` here on purpose. app/layout.tsx reads the CSP
+// nonce from headers(), which makes every route under it dynamic — Next then
+// serves this page with `Cache-Control: no-store` and a revalidate declaration
+// has no effect at all. It used to be set to 300 and read like page caching that
+// was never happening. The caching that does happen is on the data, in
+// aggregateNewsCached.
 
 // Fetches the default (unfiltered) view on the server so the very first HTML
 // response contains real headlines instead of an empty shell — previously
@@ -13,6 +16,6 @@ export const revalidate = 300
 // dashboard still owns filtering, search and live updates via SWR; this only
 // seeds its first paint.
 export default async function Page() {
-  const initialData = await aggregateNews(DEFAULT_NEWS_QUERY)
+  const initialData = await aggregateNewsCached(DEFAULT_NEWS_QUERY)
   return <NewsDashboard initialData={initialData} />
 }

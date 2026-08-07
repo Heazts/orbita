@@ -33,8 +33,9 @@ type HeaderProps = {
   preferencesOpen: boolean
   onPreferencesToggle: () => void
   // Theme state lives in the dashboard (single useTheme instance) so the
-  // header toggle and the preferences panel stay in sync.
-  theme: Theme
+  // header toggle and the preferences panel stay in sync. null until hydration
+  // — the server cannot know which theme the reader's device resolves to.
+  theme: Theme | null
   onToggleTheme: () => void
 }
 
@@ -107,10 +108,27 @@ export function Header({
             <Gamepad2 className="size-4" aria-hidden="true" />
           </Link>
           <IconButton
-            label={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
+            // Neutral until the theme is known, so the server render and the
+            // first client render produce the same text. Naming a specific
+            // theme here before hydration is what tripped React's hydration
+            // check (#418) for every reader on a dark device.
+            label={
+              theme === null
+                ? "Alternar entre tema claro e escuro"
+                : theme === "dark"
+                  ? "Ativar tema claro"
+                  : "Ativar tema escuro"
+            }
             onClick={onToggleTheme}
           >
-            {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            {/* Which icon is visible is decided by CSS, not by React state.
+                The boot script in app/layout.tsx puts .dark on <html> before
+                hydration and the dark: variant keys off that class, so the
+                correct icon is painted on the very first frame — with nothing
+                for the two renders to disagree about, and no swap after
+                hydration for a dark-theme reader to notice. */}
+            <Moon className="size-4 dark:hidden" aria-hidden="true" />
+            <Sun className="hidden size-4 dark:block" aria-hidden="true" />
           </IconButton>
           <IconButton
             label="Preferências"

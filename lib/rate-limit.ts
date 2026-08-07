@@ -7,6 +7,36 @@ import { isIP } from "node:net"
 export const RATE_LIMIT_WINDOW_MS = 60_000
 export const RATE_LIMIT_MAX_REQUESTS = 30
 
+/**
+ * A named counter with its own budget.
+ *
+ * Routes must not share one bucket. A page can legitimately request a hundred
+ * thumbnails while making a single call to /api/news; counting both against the
+ * same 30/minute allowance would break the page for an ordinary reader long
+ * before it inconvenienced anyone abusing it. The name is part of the key, so
+ * each route's traffic is counted separately in memory and in Redis.
+ */
+export type RateLimitBucket = {
+  name: string
+  max: number
+}
+
+/** Search and feed reads: one call per view, so the budget can stay tight. */
+export const NEWS_BUCKET: RateLimitBucket = { name: "news", max: RATE_LIMIT_MAX_REQUESTS }
+
+/**
+ * Image proxy. Sized for the page, not the endpoint: a full scroll through the
+ * 100-item list requests up to 100 thumbnails, so the budget has to clear that
+ * with room for a reload before it starts blanking images for real readers.
+ */
+export const IMAGE_BUCKET: RateLimitBucket = { name: "img", max: 240 }
+
+/**
+ * CSP violation reports. Genuine reports arrive in bursts (one page can breach
+ * several directives at once) but a browser has no reason to exceed this.
+ */
+export const CSP_REPORT_BUCKET: RateLimitBucket = { name: "csp", max: 60 }
+
 const requestLog = new Map<string, number[]>()
 const MAX_TRACKED_CLIENTS = 10_000
 let lastCleanupAt = 0
@@ -18,10 +48,19 @@ function normalizedIp(value: string | null): string | null {
   return candidate && candidate.length <= 45 && isIP(candidate) ? candidate : null
 }
 
-// x-real-ip is set by the edge proxy from the actual TCP connection and can't be
-// spoofed by the client. x-forwarded-for can have attacker-supplied entries
-// prepended, but the proxy appends the real client IP as the *last* entry — so
-// that's the one to trust, never the first.
+// TRUST BOUNDARY. Both headers read here are attacker-controlled on the wire;
+// what makes them usable is the hosting platform overwriting them at the edge
+// from the real TCP peer. Vercel — this app's deployment target — does exactly
+// that, which is why x-real-ip is taken at face value and why the *last*
+// x-forwarded-for entry (the one a forwarding proxy appends, as opposed to the
+// leading entries a client can forge) is the one trusted.
+//
+// This is an assumption about the deployment, not a property of this code. Host
+// the app anywhere that passes these headers through untouched and the rate
+// limiter becomes decorative: a caller that varies x-real-ip per request gets a
+// fresh budget every time. Verify after any hosting change by sending two
+// requests with different forged x-real-ip values and confirming
+// X-RateLimit-Remaining does *not* reset between them.
 export function clientIp(request: Pick<NextRequest, "headers">): string {
   const realIp = normalizedIp(request.headers.get("x-real-ip"))
   if (realIp) return realIp
@@ -48,14 +87,24 @@ export type RateLimitResult = {
   retryAfterSeconds: number
 }
 
-export function checkRateLimit(clientId: string, now: number = Date.now()): RateLimitResult {
+export function checkRateLimit(
+  clientId: string,
+  now: number = Date.now(),
+  bucket: RateLimitBucket = NEWS_BUCKET,
+): RateLimitResult {
   // clientIp() returns a fresh unknown-<uuid> per call when no IP header is
   // present. Storing those keys would leak memory (each entry lives for the
   // whole window but can never be revisited), so short-circuit here — the
   // effective outcome is identical to a first-and-only hit.
+  //
+  // Tested against the raw clientId, before the bucket prefix is applied: a
+  // prefixed key would no longer start with "unknown-" and the guard would
+  // silently stop working.
   if (clientId.startsWith("unknown-")) {
-    return { limited: false, remaining: RATE_LIMIT_MAX_REQUESTS - 1, retryAfterSeconds: 0 }
+    return { limited: false, remaining: bucket.max - 1, retryAfterSeconds: 0 }
   }
+
+  const bucketKey = `${bucket.name}:${clientId}`
 
   // Remove expired buckets periodically and cap the map even within a single
   // window. Without both guards, a stream of unique client addresses could
@@ -69,26 +118,30 @@ export function checkRateLimit(clientId: string, now: number = Date.now()): Rate
     lastCleanupAt = now
   }
 
-  const knownClient = requestLog.has(clientId)
+  const knownClient = requestLog.has(bucketKey)
   if (!knownClient && requestLog.size >= MAX_TRACKED_CLIENTS) {
     const oldestClient = requestLog.keys().next().value
     if (oldestClient !== undefined) requestLog.delete(oldestClient)
   }
 
-  const recent = (requestLog.get(clientId) ?? []).filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS)
+  const recent = (requestLog.get(bucketKey) ?? []).filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS)
   recent.push(now)
   // Refresh insertion order so the bounded map evicts the least recently seen
   // client when it reaches capacity.
-  if (knownClient) requestLog.delete(clientId)
-  requestLog.set(clientId, recent)
-  const limited = recent.length > RATE_LIMIT_MAX_REQUESTS
-  const remaining = Math.max(0, RATE_LIMIT_MAX_REQUESTS - recent.length)
+  if (knownClient) requestLog.delete(bucketKey)
+  requestLog.set(bucketKey, recent)
+  const limited = recent.length > bucket.max
+  const remaining = Math.max(0, bucket.max - recent.length)
   const retryAfterSeconds = limited ? Math.max(1, Math.ceil((RATE_LIMIT_WINDOW_MS - (now - recent[0])) / 1000)) : 0
   return { limited, remaining, retryAfterSeconds }
 }
 
-export function isRateLimited(clientId: string, now: number = Date.now()): boolean {
-  return checkRateLimit(clientId, now).limited
+export function isRateLimited(
+  clientId: string,
+  now: number = Date.now(),
+  bucket: RateLimitBucket = NEWS_BUCKET,
+): boolean {
+  return checkRateLimit(clientId, now, bucket).limited
 }
 
 // Exposed for tests so state doesn't leak between cases.
@@ -156,15 +209,16 @@ async function upstashPipeline(commands: (string | number)[][]): Promise<unknown
 export async function checkRateLimitDistributed(
   clientId: string,
   now: number = Date.now(),
+  bucket: RateLimitBucket = NEWS_BUCKET,
 ): Promise<RateLimitResult> {
   // Clients with no identifying IP get a unique key per request (see clientIp),
   // so a shared counter is meaningless — skip Redis and use the local path.
   if (!isDistributedRateLimitEnabled() || clientId.startsWith("unknown-")) {
-    return checkRateLimit(clientId, now)
+    return checkRateLimit(clientId, now, bucket)
   }
 
   const windowStart = Math.floor(now / RATE_LIMIT_WINDOW_MS)
-  const key = `orbita:rl:${clientId}:${windowStart}`
+  const key = `orbita:rl:${bucket.name}:${clientId}:${windowStart}`
   // INCR creates the key at 1 on the first hit; PEXPIRE bounds its lifetime to
   // the window so stale keys clean themselves up.
   const results = await upstashPipeline([
@@ -173,10 +227,10 @@ export async function checkRateLimitDistributed(
   ])
 
   const count = results && typeof results[0] === "number" ? results[0] : null
-  if (count === null) return checkRateLimit(clientId, now)
+  if (count === null) return checkRateLimit(clientId, now, bucket)
 
-  const limited = count > RATE_LIMIT_MAX_REQUESTS
-  const remaining = Math.max(0, RATE_LIMIT_MAX_REQUESTS - count)
+  const limited = count > bucket.max
+  const remaining = Math.max(0, bucket.max - count)
   const windowEnd = (windowStart + 1) * RATE_LIMIT_WINDOW_MS
   const retryAfterSeconds = limited ? Math.max(1, Math.ceil((windowEnd - now) / 1000)) : 0
   return { limited, remaining, retryAfterSeconds }

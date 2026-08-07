@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { FEED_SOURCES, NEWS_CATEGORIES, plainText } from "@/lib/news"
 import { aggregateNews } from "@/lib/aggregate"
-import { RATE_LIMIT_MAX_REQUESTS, checkRateLimitDistributed, clientIp } from "@/lib/rate-limit"
+import { NEWS_BUCKET, checkRateLimitDistributed, clientIp } from "@/lib/rate-limit"
 
 export const revalidate = 300
 
@@ -9,9 +9,9 @@ export async function GET(request: NextRequest) {
   const clientId = clientIp(request)
   // Uses Upstash Redis for a cross-instance limit when configured, otherwise
   // falls back to the per-instance in-memory counter.
-  const rate = await checkRateLimitDistributed(clientId)
+  const rate = await checkRateLimitDistributed(clientId, Date.now(), NEWS_BUCKET)
   const rateHeaders: Record<string, string> = {
-    "X-RateLimit-Limit": String(RATE_LIMIT_MAX_REQUESTS),
+    "X-RateLimit-Limit": String(NEWS_BUCKET.max),
     "X-RateLimit-Remaining": String(rate.remaining),
   }
   if (rate.limited) {
