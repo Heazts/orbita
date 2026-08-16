@@ -79,8 +79,42 @@ export function findImage(item: Record<string, unknown>): string | null {
 
   const rawHtml = textValue(item.description ?? item["content:encoded"] ?? item.content)
   const html = decodeEntities(decodeEntities(rawHtml))
-  for (const match of html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)) {
-    if (isUsableImage(match[1])) return match[1]
+  const lower = html.toLowerCase()
+  let offset = 0
+  while (offset < html.length) {
+    const tagStart = lower.indexOf("<img", offset)
+    if (tagStart < 0) break
+    const tagEnd = lower.indexOf(">", tagStart + 4)
+    // An unclosed tag consumes the rest of the HTML. Stop once instead of
+    // restarting a regex at every later <img prefix and rescanning the suffix.
+    if (tagEnd < 0) break
+
+    let cursor = tagStart + 4
+    while (cursor < tagEnd) {
+      while (cursor < tagEnd && (/\s/.test(html[cursor]) || html[cursor] === "/")) cursor += 1
+      const nameStart = cursor
+      while (cursor < tagEnd && !/[\s=/>]/.test(html[cursor])) cursor += 1
+      if (cursor === nameStart) {
+        cursor += 1
+        continue
+      }
+      const name = lower.slice(nameStart, cursor)
+      while (cursor < tagEnd && /\s/.test(html[cursor])) cursor += 1
+      if (html[cursor] !== "=") continue
+      cursor += 1
+      while (cursor < tagEnd && /\s/.test(html[cursor])) cursor += 1
+      const quote = html[cursor]
+      if (quote !== '"' && quote !== "'") continue
+      const valueStart = cursor + 1
+      const valueEnd = html.indexOf(quote, valueStart)
+      if (valueEnd < 0 || valueEnd > tagEnd) break
+      if (name === "src") {
+        const candidate = html.slice(valueStart, valueEnd)
+        if (isUsableImage(candidate)) return candidate
+      }
+      cursor = valueEnd + 1
+    }
+    offset = tagEnd + 1
   }
   return null
 }

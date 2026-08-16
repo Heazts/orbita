@@ -4,6 +4,7 @@ import { isIP } from "node:net"
 import { NextRequest, NextResponse } from "next/server"
 import { resolveRemoteImageUrl, type ResolvedRemoteUrl } from "@/lib/safe-remote-url"
 import { IMAGE_BUCKET, checkRateLimitDistributed, clientIp } from "@/lib/rate-limit"
+import { verifyImageProxySignature } from "@/lib/image-proxy-signature"
 
 export const runtime = "nodejs"
 
@@ -72,7 +73,7 @@ function requestPinnedImage(target: ResolvedRemoteUrl): Promise<RemoteResult> {
         const statusCode = response.statusCode ?? 502
         if (REDIRECT_STATUSES.has(statusCode)) {
           const location = response.headers.location
-          response.resume()
+          response.destroy()
           if (!location) {
             reject(new RemoteImageStatusError())
             return
@@ -82,21 +83,21 @@ function requestPinnedImage(target: ResolvedRemoteUrl): Promise<RemoteResult> {
         }
 
         if (statusCode < 200 || statusCode >= 300) {
-          response.resume()
+          response.destroy()
           reject(new RemoteImageStatusError())
           return
         }
 
         const contentType = parseContentType(response.headers)
         if (!ALLOWED_MIME.has(contentType)) {
-          response.resume()
+          response.destroy()
           reject(new UnsupportedImageError())
           return
         }
 
         const declaredLength = Number(response.headers["content-length"] ?? 0)
         if (Number.isFinite(declaredLength) && declaredLength > MAX_IMAGE_BYTES) {
-          response.resume()
+          response.destroy()
           reject(new ImageTooLargeError())
           return
         }
@@ -142,15 +143,9 @@ async function fetchWithSafeRedirects(initialUrl: string): Promise<{ contentType
 }
 
 export async function GET(request: NextRequest) {
-  // The SSRF guards below decide *where* this may fetch; they say nothing about
-  // how often. Without a limit the route is an open relay: any caller can point
-  // it at any public HTTPS image and have this server pull up to MAX_IMAGE_BYTES
-  // on their behalf, with no account, no referrer check and a CDN entry keyed by
-  // their chosen URL. That is bandwidth and egress cost with someone else's hand
-  // on the tap, an anonymising fetcher wearing this deployment's addresses, and
-  // — through the distinct 502/415/504 replies below — a probe for which public
-  // HTTPS hosts answer. Counted in its own bucket so a page loading its
-  // thumbnails cannot exhaust the reader's /api/news budget, or vice versa.
+  // Count every attempt before validation. Valid destinations also need a
+  // server-side signature issued while aggregating a configured feed, so this
+  // endpoint cannot be used as a generic public HTTPS relay.
   const rate = await checkRateLimitDistributed(clientIp(request), Date.now(), IMAGE_BUCKET)
   if (rate.limited) {
     return new NextResponse("Muitas requisições", {
@@ -168,6 +163,12 @@ export async function GET(request: NextRequest) {
 
   const urlParam = request.nextUrl.searchParams.get("url")
   if (!urlParam) return new NextResponse("Parâmetro URL não informado", { status: 400 })
+  if (!verifyImageProxySignature(urlParam, request.nextUrl.searchParams.get("sig"))) {
+    return new NextResponse("Assinatura de imagem inválida", {
+      status: 403,
+      headers: { "Cache-Control": "private, no-store" },
+    })
+  }
 
   try {
     const { buffer, contentType } = await fetchWithSafeRedirects(urlParam)

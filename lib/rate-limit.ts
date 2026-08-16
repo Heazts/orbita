@@ -32,10 +32,12 @@ export const NEWS_BUCKET: RateLimitBucket = { name: "news", max: RATE_LIMIT_MAX_
 export const IMAGE_BUCKET: RateLimitBucket = { name: "img", max: 240 }
 
 /**
- * CSP violation reports. Genuine reports arrive in bursts (one page can breach
- * several directives at once) but a browser has no reason to exceed this.
+ * CSP request envelopes and individual log lines are separate resources. A
+ * single Reporting API envelope may contain several reports, so charging only
+ * the request bucket would multiply the effective log allowance.
  */
-export const CSP_REPORT_BUCKET: RateLimitBucket = { name: "csp", max: 60 }
+export const CSP_REQUEST_BUCKET: RateLimitBucket = { name: "csp-requests", max: 60 }
+export const CSP_REPORT_BUCKET: RateLimitBucket = { name: "csp-report-lines", max: 60 }
 
 const requestLog = new Map<string, number[]>()
 const MAX_TRACKED_CLIENTS = 10_000
@@ -91,7 +93,9 @@ export function checkRateLimit(
   clientId: string,
   now: number = Date.now(),
   bucket: RateLimitBucket = NEWS_BUCKET,
+  cost = 1,
 ): RateLimitResult {
+  const units = Number.isSafeInteger(cost) && cost > 0 ? cost : 1
   // clientIp() returns a fresh unknown-<uuid> per call when no IP header is
   // present. Storing those keys would leak memory (each entry lives for the
   // whole window but can never be revisited), so short-circuit here — the
@@ -101,7 +105,7 @@ export function checkRateLimit(
   // prefixed key would no longer start with "unknown-" and the guard would
   // silently stop working.
   if (clientId.startsWith("unknown-")) {
-    return { limited: false, remaining: bucket.max - 1, retryAfterSeconds: 0 }
+    return { limited: false, remaining: Math.max(0, bucket.max - units), retryAfterSeconds: 0 }
   }
 
   const bucketKey = `${bucket.name}:${clientId}`
@@ -125,14 +129,22 @@ export function checkRateLimit(
   }
 
   const recent = (requestLog.get(bucketKey) ?? []).filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS)
-  recent.push(now)
+  const limited = recent.length + units > bucket.max
+  // Rejected work must not grow the state. Besides making the retry delay
+  // unfairly move forward, recording every rejected request made the next
+  // request filter and copy an attacker-sized array. Keeping at most bucket.max
+  // timestamps preserves the sliding-window semantics with bounded memory and
+  // bounded work per call.
+  if (!limited) {
+    for (let index = 0; index < units; index += 1) recent.push(now)
+  }
   // Refresh insertion order so the bounded map evicts the least recently seen
   // client when it reaches capacity.
   if (knownClient) requestLog.delete(bucketKey)
   requestLog.set(bucketKey, recent)
-  const limited = recent.length > bucket.max
   const remaining = Math.max(0, bucket.max - recent.length)
-  const retryAfterSeconds = limited ? Math.max(1, Math.ceil((RATE_LIMIT_WINDOW_MS - (now - recent[0])) / 1000)) : 0
+  const oldest = recent[0] ?? now
+  const retryAfterSeconds = limited ? Math.max(1, Math.ceil((RATE_LIMIT_WINDOW_MS - (now - oldest)) / 1000)) : 0
   return { limited, remaining, retryAfterSeconds }
 }
 
@@ -210,24 +222,26 @@ export async function checkRateLimitDistributed(
   clientId: string,
   now: number = Date.now(),
   bucket: RateLimitBucket = NEWS_BUCKET,
+  cost = 1,
 ): Promise<RateLimitResult> {
+  const units = Number.isSafeInteger(cost) && cost > 0 ? cost : 1
   // Clients with no identifying IP get a unique key per request (see clientIp),
   // so a shared counter is meaningless — skip Redis and use the local path.
   if (!isDistributedRateLimitEnabled() || clientId.startsWith("unknown-")) {
-    return checkRateLimit(clientId, now, bucket)
+    return checkRateLimit(clientId, now, bucket, units)
   }
 
   const windowStart = Math.floor(now / RATE_LIMIT_WINDOW_MS)
   const key = `orbita:rl:${bucket.name}:${clientId}:${windowStart}`
-  // INCR creates the key at 1 on the first hit; PEXPIRE bounds its lifetime to
-  // the window so stale keys clean themselves up.
+  // INCRBY creates the key on the first hit and atomically charges a request or
+  // an entire bounded batch; PEXPIRE keeps stale windows self-cleaning.
   const results = await upstashPipeline([
-    ["INCR", key],
+    ["INCRBY", key, units],
     ["PEXPIRE", key, RATE_LIMIT_WINDOW_MS],
   ])
 
   const count = results && typeof results[0] === "number" ? results[0] : null
-  if (count === null) return checkRateLimit(clientId, now, bucket)
+  if (count === null) return checkRateLimit(clientId, now, bucket, units)
 
   const limited = count > bucket.max
   const remaining = Math.max(0, bucket.max - count)

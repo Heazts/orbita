@@ -22,6 +22,8 @@ const privacy = readFileSync(new URL("../app/privacidade/page.tsx", import.meta.
 const terms = readFileSync(new URL("../app/termos/page.tsx", import.meta.url), "utf8")
 const layout = readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8")
 const newsImage = readFileSync(new URL("../components/ui/news-image.tsx", import.meta.url), "utf8")
+const aggregateSource = readFileSync(new URL("../lib/aggregate.ts", import.meta.url), "utf8")
+const imageProxySignature = readFileSync(new URL("../lib/image-proxy-signature.ts", import.meta.url), "utf8")
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"))
 const rateLimitSource = readFileSync(new URL("../lib/rate-limit.ts", import.meta.url), "utf8")
 
@@ -56,9 +58,12 @@ describe("privacy page claims match the code", () => {
     expect(layout).toContain("<SpeedInsights />")
   })
 
-  // The page now claims images are proxied rather than fetched by the browser.
-  it("describes image loading the way the component actually does it", () => {
-    expect(newsImage).toContain("/api/img-proxy")
+  // The server signs feed images into same-origin proxy paths; the client no
+  // longer turns arbitrary remote URLs into proxy requests by itself.
+  it("describes image loading the way the server and component actually do it", () => {
+    expect(aggregateSource).toContain("createImageProxyUrl")
+    expect(imageProxySignature).toContain("/api/img-proxy")
+    expect(newsImage).toContain('src.startsWith("/")')
     expect(privacy).toContain("proxy")
     expect(privacy).not.toContain("carregadas diretamente dos servidores")
   })
