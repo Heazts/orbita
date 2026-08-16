@@ -10,13 +10,17 @@ vi.mock("next/cache", () => ({
   unstable_cache: <T extends (...args: never[]) => unknown>(fn: T) => fn,
 }))
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
+})
 
-function feedXml(title: string, link: string): string {
+function feedXml(title: string, link: string, description = ""): string {
   return `<?xml version="1.0"?><rss version="2.0"><channel>
     <item>
       <title>${title}</title>
       <link>${link}</link>
+      <description>${description}</description>
       <pubDate>${new Date().toUTCString()}</pubDate>
     </item>
   </channel></rss>`
@@ -67,6 +71,26 @@ describe("aggregateNews when sources work", () => {
     expect(result.items.length).toBeGreaterThan(0)
     expect(result.sourcesUnavailable).toBe(false)
     expect(result.failedSources).toBeUndefined()
+  })
+
+  it("emits only server-signed image proxy URLs", async () => {
+    vi.stubEnv("IMAGE_PROXY_SECRET", "test-image-secret")
+    vi.stubGlobal(
+      "fetch",
+      async (input: string | URL) =>
+        new Response(
+          feedXml(
+            "Manchete com foto",
+            `https://example.com/${encodeURIComponent(String(input))}`,
+            '&lt;img src="https://cdn.example.com/photo.jpg"&gt;',
+          ),
+          { status: 200 },
+        ),
+    )
+
+    const result = await aggregateNews(DEFAULT_NEWS_QUERY)
+    expect(result.items.some((item) => item.image?.startsWith("/api/img-proxy?url=") && item.image.includes("sig="))).toBe(true)
+    expect(result.items.every((item) => !item.image?.startsWith("https://"))).toBe(true)
   })
 
   // An empty result for a search is the reader's filter, not an outage, and

@@ -1,3 +1,5 @@
+import { fetchSameOrigin } from "@/lib/safe-fetch"
+
 export type Trend = "up" | "down" | "flat"
 
 export type FinancialIndicator = {
@@ -14,6 +16,7 @@ export type FinancialIndicator = {
 const CURRENCY_ENDPOINT = "https://economia.awesomeapi.com.br/last/USD-BRL,EUR-BRL,BTC-BRL"
 const BCB_SERIES = "https://api.bcb.gov.br/dados/serie/bcdata.sgs"
 const TIMEOUT_MS = 5_000
+const MAX_FINANCE_RESPONSE_BYTES = 100_000
 
 function trendOf(delta: number): Trend {
   if (delta > 0) return "up"
@@ -34,12 +37,34 @@ function signedChange(value: number, digits = 2): { text: string; trend: Trend }
 
 async function getJson<T>(url: string): Promise<T | null> {
   try {
-    const response = await fetch(url, {
+    const response = await fetchSameOrigin(url, {
       signal: AbortSignal.timeout(TIMEOUT_MS),
       next: { revalidate: 60 },
     })
     if (!response.ok) return null
-    return (await response.json()) as T
+    const declaredLength = Number(response.headers.get("content-length") ?? 0)
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_FINANCE_RESPONSE_BYTES) {
+      await response.body?.cancel()
+      return null
+    }
+
+    const reader = response.body?.getReader()
+    if (!reader) return null
+    const decoder = new TextDecoder()
+    let json = ""
+    let total = 0
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > MAX_FINANCE_RESPONSE_BYTES) {
+        await reader.cancel()
+        return null
+      }
+      json += decoder.decode(value, { stream: true })
+    }
+    json += decoder.decode()
+    return JSON.parse(json) as T
   } catch {
     return null
   }

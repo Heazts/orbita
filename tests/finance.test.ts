@@ -99,4 +99,18 @@ describe("fetchFinancialIndicators", () => {
     mockFetch(() => null)
     expect(await fetchFinancialIndicators()).toEqual([])
   })
+
+  it("rejects an oversized upstream JSON body instead of materializing it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ padding: "x".repeat(150_000) }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    )
+
+    expect(await fetchFinancialIndicators()).toEqual([])
+  })
 })

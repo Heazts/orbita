@@ -1,11 +1,12 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
 import { NextRequest } from "next/server"
 import { POST, GET } from "@/app/api/csp-report/route"
+import { resetRateLimit } from "@/lib/rate-limit"
 
 function report(body: string, headers: Record<string, string> = {}): NextRequest {
   return new NextRequest("https://orbita.news/api/csp-report", {
     method: "POST",
-    headers: { "content-type": "application/csp-report", ...headers },
+    headers: { "content-type": "application/csp-report", "x-real-ip": "203.0.113.50", ...headers },
     body,
   })
 }
@@ -13,10 +14,12 @@ function report(body: string, headers: Record<string, string> = {}): NextRequest
 let warn: ReturnType<typeof vi.spyOn>
 
 beforeEach(() => {
+  resetRateLimit()
   warn = vi.spyOn(console, "warn").mockImplementation(() => {})
 })
 
 afterEach(() => {
+  resetRateLimit()
   warn.mockRestore()
 })
 
@@ -82,6 +85,18 @@ describe("POST /api/csp-report", () => {
     const entry = { body: { effectiveDirective: "img-src" } }
     await POST(report(JSON.stringify(Array.from({ length: 50 }, () => entry))))
     expect(warn.mock.calls.length).toBe(20)
+  })
+
+  it("caps amplified log lines across request batches", async () => {
+    const entry = { body: { effectiveDirective: "img-src" } }
+    const batch = JSON.stringify(Array.from({ length: 20 }, () => entry))
+
+    await POST(report(batch))
+    await POST(report(batch))
+    await POST(report(batch))
+    await POST(report(batch))
+
+    expect(warn.mock.calls.length).toBe(60)
   })
 
   it("strips newlines from report fields so logs cannot be forged", async () => {

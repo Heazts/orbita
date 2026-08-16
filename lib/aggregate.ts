@@ -10,6 +10,8 @@ import {
 import { parseFeed, relevance } from "@/lib/parse"
 import { toClusteredItems } from "@/lib/clustering"
 import type { Sort } from "@/lib/types"
+import { fetchSameOrigin } from "@/lib/safe-fetch"
+import { createImageProxyUrl } from "@/lib/image-proxy-signature"
 
 // Cap the feed body we buffer so a pathological (or compromised) feed can't
 // exhaust memory. The abort timeouts bound download time; this bounds size.
@@ -42,9 +44,8 @@ async function readCapped(response: Response, maxBytes: number, label: string): 
 }
 
 async function fetchFeed(url: string, userAgent: string, timeoutMs: number, label: string): Promise<string> {
-  const response = await fetch(url, {
+  const response = await fetchSameOrigin(url, {
     headers: { "User-Agent": userAgent },
-    redirect: "follow",
     next: { revalidate: 300 },
     signal: AbortSignal.timeout(timeoutMs),
   })
@@ -157,7 +158,10 @@ export async function aggregateNews({ query, category, source, period, sort }: N
   // their intent and keep the pure chronological/relevance order above.
   const isDefaultView =
     !query && category === "Todas" && source === "Todas" && period === 0 && sort === "latest"
-  const items = isDefaultView ? curateHomepage(unique) : unique
+  const items = (isDefaultView ? curateHomepage(unique) : unique).map((item) => ({
+    ...item,
+    image: item.image ? createImageProxyUrl(item.image) : null,
+  }))
 
   return {
     items,

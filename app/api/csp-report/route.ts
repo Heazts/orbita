@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { CSP_REPORT_BUCKET, checkRateLimitDistributed, clientIp } from "@/lib/rate-limit"
+import {
+  CSP_REPORT_BUCKET,
+  CSP_REQUEST_BUCKET,
+  checkRateLimitDistributed,
+  clientIp,
+} from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
 
@@ -58,7 +63,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // billed, and this is the same channel /api/health and the ingest cron use to
   // report dead feeds — drowning it in forged violations buries the signals
   // that are worth reading.
-  const rate = await checkRateLimitDistributed(clientIp(request), Date.now(), CSP_REPORT_BUCKET)
+  const requester = clientIp(request)
+  const now = Date.now()
+  const rate = await checkRateLimitDistributed(requester, now, CSP_REQUEST_BUCKET)
   // 429 with no body: a browser's reporting queue is fire-and-forget and reads
   // nothing back, so there is nothing useful to say.
   if (rate.limited) {
@@ -88,6 +95,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   )
     .filter((body): body is CspBody => isRecord(body))
     .slice(0, MAX_REPORTS_PER_REQUEST)
+
+  // Charge the actual amplified operation, not only its HTTP envelope. The
+  // whole batch is accepted or dropped so concurrent instances can make one
+  // atomic INCRBY decision when the distributed limiter is enabled.
+  if (reports.length > 0) {
+    const logRate = await checkRateLimitDistributed(requester, now, CSP_REPORT_BUCKET, reports.length)
+    if (logRate.limited) return new NextResponse(null, { status: 204 })
+  }
 
   for (const body of reports) {
     const directive = sanitize(body["violated-directive"] ?? body.effectiveDirective, 256)

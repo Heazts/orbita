@@ -14,10 +14,11 @@ export function NewsImage({ src, alt, lead }: NewsImageProps) {
 
   if (failed) return null
 
-  // Pass external HTTP/HTTPS images through our privacy-preserving image proxy
-  const imageSrc = /^https?:\/\//i.test(src) && !src.startsWith("/api/img-proxy")
-    ? `/api/img-proxy?url=${encodeURIComponent(src)}`
-    : src
+  // Remote URLs are signed on the server while aggregating configured feeds.
+  // Never turn an arbitrary client-provided URL into an unsigned proxy call.
+  const imageSrc = src.startsWith("/") ? src : null
+
+  if (!imageSrc) return null
 
   return (
     <div className={`relative overflow-hidden ${lead ? "aspect-video w-full rounded-xl" : "size-20 shrink-0 rounded-xl sm:size-24"}`}>

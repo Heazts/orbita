@@ -108,6 +108,28 @@ describe("checkRateLimit", () => {
     // resetRateLimit() in afterEach would mask the leak — check now:
     expect(isRateLimited("unknown-fresh", now)).toBe(false)
   })
+
+  it("does not retain rejected requests or postpone recovery", () => {
+    const bucket = { name: "bounded", max: 2 }
+    const start = 10_000_000
+    expect(checkRateLimit("attacker", start, bucket).limited).toBe(false)
+    expect(checkRateLimit("attacker", start + 1, bucket).limited).toBe(false)
+
+    for (let index = 0; index < 10_000; index += 1) {
+      expect(checkRateLimit("attacker", start + 1_000 + index, bucket).limited).toBe(true)
+    }
+
+    // Once the first accepted request expires, one slot is available again.
+    // The rejected flood must not have filled the window with new timestamps.
+    expect(checkRateLimit("attacker", start + 60_001, bucket).limited).toBe(false)
+  })
+
+  it("charges a batch atomically", () => {
+    const bucket = { name: "batch", max: 5 }
+    expect(checkRateLimit("a", 11_000_000, bucket, 4)).toMatchObject({ limited: false, remaining: 1 })
+    expect(checkRateLimit("a", 11_000_000, bucket, 2)).toMatchObject({ limited: true, remaining: 1 })
+    expect(checkRateLimit("a", 11_000_000, bucket, 1)).toMatchObject({ limited: false, remaining: 0 })
+  })
 })
 
 describe("checkRateLimitDistributed", () => {

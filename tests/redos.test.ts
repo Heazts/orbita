@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { plainText, truncate } from "@/lib/news"
+import { findImage } from "@/lib/parse"
 
 // Regression guard for polynomial backtracking on feed text.
 //
@@ -61,6 +62,23 @@ describe("truncate resists polynomial backtracking", () => {
   it("handles a long trailing punctuation run", () => {
     const input = `Manchete ${".".repeat(200_000)}x`
     expect(elapsed(() => truncate(input, 220))).toBeLessThan(BUDGET_MS)
+  })
+})
+
+describe("findImage scans malformed tags in linear time", () => {
+  it("handles many incomplete img prefixes within the budget", () => {
+    const input = `${"<img ".repeat(40_000)}x`
+    expect(elapsed(() => findImage({ description: input }))).toBeLessThan(BUDGET_MS)
+    expect(findImage({ description: input })).toBeNull()
+  })
+
+  it("scales sub-quadratically and still finds quoted src attributes", () => {
+    const build = (count: number) => `${"texto ".repeat(count)}<IMG alt='x' SRC = "https://cdn.site.com/photo.jpg">`
+    findImage({ description: build(1_000) })
+    const small = Math.max(elapsed(() => findImage({ description: build(20_000) })), 0.05)
+    const large = elapsed(() => findImage({ description: build(80_000) }))
+    expect(large / small).toBeLessThan(8)
+    expect(findImage({ description: build(1) })).toBe("https://cdn.site.com/photo.jpg")
   })
 })
 
